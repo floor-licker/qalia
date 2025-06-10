@@ -1,754 +1,595 @@
-# 🤖 Autonomous QA Agent
+# QA-AI: Autonomous Website Testing and Exploration
 
-An AI-powered web application testing system that uses GPT-4 and Playwright to autonomously explore websites, identify interactive elements, and detect bugs or issues.
+**Modular AI-powered web application testing system using GPT-4 and Playwright for autonomous website exploration and bug detection.**
 
-## 🎯 Features
+## SYSTEM ARCHITECTURE
 
-- **Autonomous Exploration**: AI-guided navigation through web applications
-- **State-Based Testing**: Tracks complete UI state beyond URLs (modals, dynamic content, forms)
-- **High-Performance Optimization**: 60x faster exploration with adaptive timeouts and intelligent prioritization
-- **Regression Detection**: Compares current vs. historical behavior to identify changes
-- **Intelligent Actions**: GPT-4 decides what actions to perform based on page context
-- **Bug Detection**: Automatically identifies errors, broken functionality, and suspicious behavior
-- **Dynamic Programming**: Learns from action performance to optimize future exploration
-- **State Management**: Prevents infinite loops and tracks exploration progress
-- **Comprehensive Reporting**: Detailed reports with findings and recommendations
-- **Configurable Limits**: Customizable exploration depth and action limits
-
-## 🔧 Prerequisites
-
-- **Python 3.8+**
-- **OpenAI API Key** (for GPT-4 access)
-- **Internet connection** (for OpenAI API calls)
-
-## 📦 Installation
-
-1. **Clone or download this repository**
-2. **Install Python dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Install Playwright browsers:**
-   ```bash
-   playwright install chromium
-   ```
-
-4. **Set up environment variables:**
-   
-   Create a `.env` file in the project root:
-   ```env
-   OPENAI_API_KEY=your_openai_api_key_here
-   
-   # Optional browser configuration
-   HEADLESS=false
-   BROWSER_WIDTH=1280
-   BROWSER_HEIGHT=720
-   
-   # Optional crawling limits
-   MAX_ACTIONS_PER_PAGE=10
-   MAX_TOTAL_ACTIONS=100
-   ```
-
-   **Or** set environment variables directly:
-   ```bash
-   export OPENAI_API_KEY="your_openai_api_key_here"
-   ```
-
-## 🚀 Quick Start
-
-**Basic usage:**
-```bash
-python run.py https://example.com
-```
-
-**With custom options:**
-```bash
-python run.py https://example.com --headless --max-actions 50 --verbose
-```
-
-**Clear previous state and start fresh:**
-```bash
-python run.py https://example.com --clear-state
-```
-
-## 📖 Usage Examples
-
-### Test a Login Form
-```bash
-python run.py https://yourapp.com/login --max-actions-per-page 5
-```
-
-### Comprehensive Site Testing
-```bash
-python run.py https://yourapp.com --max-actions 200 --timeout 7200 --verbose
-```
-
-### Headless Testing for CI/CD
-```bash
-python run.py https://yourapp.com --headless --output ci_results.json
-```
-
-## ⚙️ Command Line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `url` | Starting URL to test (required) | - |
-| `--headless` | Run browser in headless mode | False |
-| `--max-actions` | Maximum total actions to perform | 100 |
-| `--max-actions-per-page` | Maximum actions per page | 10 |
-| `--width` | Browser viewport width | 1280 |
-| `--height` | Browser viewport height | 720 |
-| `--verbose, -v` | Enable verbose logging | False |
-| `--clear-state` | Clear previous crawling state | False |
-| `--output` | Output file for results | qa_results.json |
-| `--timeout` | Maximum runtime in seconds | 3600 |
-
-## 📊 Output Files
-
-The system generates several output files:
-
-- **`qa_results.json`** - Complete exploration results in JSON format
-- **`qa_session_report.txt`** - Human-readable session report
-- **`qa_crawler.log`** - Detailed execution logs
-- **`state_store.json`** - Exploration state (for resuming sessions)
-- **`site_maps/{domain}_sitemap.json`** - Complete site structure and state mappings
-- **`site_maps/{domain}_state_graph.json`** - UI state transition graph for regression testing
-
-## 🎯 Exploration Strategies
-
-The system automatically selects optimal exploration strategies based on context:
-
-### Discovery Exploration
-- **Fresh sites**: Systematic breadth-first exploration
-- **Focus**: Maximum coverage of new functionality
-- **Speed**: Prioritizes high-value elements first
-
-### Incremental Testing  
-- **Known sites**: Tests only newly discovered elements
-- **Focus**: Efficient updates to existing test coverage
-- **Speed**: Skips previously explored functionality
-
-### Regression Testing
-- **Existing sites**: Compares current behavior against historical state graphs
-- **Focus**: Detecting changes in previously working functionality  
-- **Speed**: Targets areas most likely to have regressions
-
-### Intelligent Exploration
-- **Complex sites**: AI-guided exploration using GPT-4 insights
-- **Focus**: Context-aware testing of critical user flows
-- **Speed**: Strategic element selection based on business value
-
-## 🏗️ Architecture
-
-### Core Components
-
-1. **`run.py`** - Main entry point and CLI interface
-2. **`explorer.py`** - Core exploration engine using Playwright
-3. **`gpt_agent.py`** - GPT-4 integration for decision making
-4. **`evaluator.py`** - Bug detection and result evaluation
-5. **`utils.py`** - HTML parsing and utility functions
-6. **`state_store.py`** - State management and persistence
-7. **`state_fingerprint.py`** - Advanced state tracking beyond URLs
-8. **`performance_optimizer.py`** - High-speed exploration optimizations
-
-### How It Works
-
-1. **Page Analysis**: Extracts interactive elements (buttons, forms, links)
-2. **AI Decision**: GPT-4 chooses the most interesting action to perform
-3. **Action Execution**: Playwright performs the chosen action
-4. **Result Evaluation**: Analyzes the outcome for bugs or issues
-5. **State Tracking**: Records actions to avoid repetition
-6. **Reporting**: Generates comprehensive reports
-
-## 🚀 Performance Optimizations
-
-The system includes intelligent performance optimizations that dramatically speed up exploration while maintaining quality:
-
-### Dynamic Programming & Machine Learning
-- **Action Profiling**: Learns from past action performance (success rates, timeouts, duration)
-- **Adaptive Timeouts**: Automatically adjusts timeouts based on learned behavior
-- **Smart Skipping**: Avoids consistently failing elements to prevent timeout loops
-
-### Greedy Element Prioritization
-Elements are prioritized by potential value for maximum efficiency:
-
-```python
-Priority Weights:
-- Buttons: 10 (highest - likely to cause state changes)
-- Links: 8 (navigation value)
-- Inputs: 6 (form interaction)  
-- Selects: 6 (form elements)
-- Generic: 3 (lowest priority)
-```
-
-### Intelligent Batch Processing
-- **Batch Execution**: Groups actions into optimal batches (default: 5 elements)
-- **Reduced State Checks**: State extraction every 3rd action instead of every action
-- **Minimal Delays**: 0.2-1.0s waits instead of fixed 2s delays
-
-### Adaptive Timeout Strategy
-
-| Scenario | Timeout | Reasoning |
-|----------|---------|-----------|
-| **Default Actions** | 5 seconds | 6x faster than original 30s |
-| **Modal Blocked** | 2 seconds | Quick fail for blocked elements |
-| **Navigation** | 8 seconds | Page loads need more time |
-| **Form Submission** | 10 seconds | Server processing time |
-
-### Performance Results
-- **~60x faster** overall exploration
-- **6-15x faster** element interactions  
-- **2x faster** page loading
-- **~10x faster** modal detection
-
-## 🔍 State-Based Exploration
-
-Unlike traditional URL-based crawlers, this system tracks **complete UI state** beyond just URLs:
-
-### What is a "State Fingerprint"?
-
-A state fingerprint is a unique identifier that captures the complete UI state, enabling detection of changes that don't affect the URL (like modal openings, dynamic content updates, etc.).
-
-### State Components
-
-Each UI state includes:
-
-```python
-UIState:
-  ├── url: str                    # Current page URL
-  ├── page_hash: str             # Content-based hash of main page
-  ├── modal_state: Dict          # Modal/dialog information
-  │   ├── has_modal: bool        # Is a modal currently open?
-  │   ├── modal_type: str        # Type of modal (dialog, popup, etc.)
-  │   └── modal_content_hash: str # Hash of modal content
-  ├── dynamic_content: Dict      # Dynamic elements state
-  │   ├── loading_states: List   # Elements currently loading
-  │   ├── error_states: List     # Elements showing errors
-  │   └── content_hashes: Dict   # Hashes of dynamic sections
-  ├── form_state: Dict           # Current form values and states
-  │   ├── filled_fields: Dict    # Currently filled form fields
-  │   ├── validation_states: Dict # Field validation states
-  │   └── submit_available: bool  # Can forms be submitted?
-  └── navigation_state: Dict     # Navigation context
-      ├── breadcrumbs: List      # Current navigation path
-      ├── active_menu: str       # Currently active menu
-      └── scroll_position: int   # Page scroll position
-```
-
-### State Transition Tracking
-
-The system creates a **state graph** that tracks how actions transition between states:
-
-```python
-StateTransition:
-  ├── from_state: str           # Source state fingerprint (e.g., "516c2350ce6b")
-  ├── to_state: str             # Destination state fingerprint (e.g., "634c12a1e752")
-  ├── action: Dict              # Action that caused the transition
-  ├── timestamp: datetime       # When transition occurred
-  └── success: bool             # Whether transition was successful
-```
-
-### Example State Transitions
-
-```
-Initial Page Load:
-  State: 516c2350ce6b (URL: /home, no modal, forms empty)
-
-Click "CONNECT" Button:
-  516c2350ce6b → 634c12a1e752 (modal opened, same URL)
-
-Fill Login Form:
-  634c12a1e752 → a8f3b2e1c4d5 (modal open, form filled)
-
-Submit Form:
-  a8f3b2e1c4d5 → 2e7f8a9b3c6d (modal closed, user logged in)
-```
-
-### Benefits of State-Based Exploration
-
-1. **Modal Detection**: Tracks when modals open/close without URL changes
-2. **Dynamic Content**: Detects AJAX updates, loading states, errors
-3. **Form State**: Knows which fields are filled, validation states
-4. **Regression Testing**: Compares current vs. previous state maps
-5. **Complete Coverage**: Tests all UI states, not just different URLs
-
-### State Graph Analysis
-
-The system maintains a complete graph of all discovered states and transitions:
-
-```python
-StateGraph:
-  ├── states: Dict[fingerprint, UIState]      # All discovered states
-  ├── transitions: List[StateTransition]      # All recorded transitions  
-  └── unexplored_edges: Dict                  # Actions not yet tried from each state
-```
-
-This enables:
-- **Intelligent Exploration**: Focus on unexplored state transitions
-- **Regression Detection**: Compare new exploration runs against historical state graphs
-- **Coverage Analysis**: Understanding which UI states have been tested
-- **Behavior Change Detection**: Identify when previously working transitions break
-
-## 🐛 Bug Detection
-
-The system automatically detects:
-
-- **HTTP Errors**: 404, 500, 403, etc.
-- **JavaScript Errors**: Console errors and exceptions
-- **Broken Navigation**: Links that don't work or lead to errors
-- **Form Issues**: Validation problems, submission failures
-- **Unexpected Redirects**: Suspicious page changes
-- **Performance Issues**: Slow loading, timeouts
-
-## 🔧 Configuration
-
-### Environment Variables
-
-```env
-# Required
-OPENAI_API_KEY=sk-...
-
-# Optional
-HEADLESS=true
-BROWSER_WIDTH=1920
-BROWSER_HEIGHT=1080
-MAX_ACTIONS_PER_PAGE=15
-MAX_TOTAL_ACTIONS=200
-```
-
-### Programmatic Usage
-
-```python
-from explorer import WebExplorer
-
-explorer = WebExplorer(
-    start_url="https://example.com",
-    headless=True,
-    max_actions=50
-)
-
-results = await explorer.start_exploration()
-print(f"Found {len(results['bugs_found'])} bugs")
-```
-
-## 📝 Example Output
-
-```
-🤖 Autonomous QA Agent
-=====================
-AI-powered web application testing using GPT-4 and Playwright
-
-📋 Configuration:
-  Target URL: https://example.com
-  Headless mode: False
-  Max actions: 100
-  Max actions per page: 10
-  Viewport: 1280x720
-  Output file: qa_results.json
-  Timeout: 3600s
-
-🚀 Starting exploration of https://example.com
-
-🎯 Exploration Summary:
-==================================================
-📄 Pages visited: 5
-⚡ Actions performed: 23
-🐛 Bugs found: 2
-⚠️  Warnings: 7
-⏱️  Duration: 145.3 seconds
-
-💡 Recommendations:
-  1. High priority: Fix 2 bugs identified during testing
-  2. Review 7 warnings for potential improvements
-
-📋 Detailed report: qa_session_report.txt
-```
-
-## 🛠️ Development
-
-### Adding Custom Evaluators
-
-```python
-class CustomEvaluator(QAEvaluator):
-    def evaluate_custom_condition(self, page_info):
-        # Add your custom evaluation logic
-        pass
-```
-
-### Extending Action Types
-
-```python
-async def _perform_custom_action(self, action):
-    if action['action'] == 'custom_action':
-        # Implement custom action logic
-        pass
-```
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-**"OpenAI API key not found"**
-- Ensure `.env` file exists with `OPENAI_API_KEY`
-- Check environment variable is set correctly
-
-**"Playwright browser not found"**
-- Run `playwright install chromium`
-- Ensure Playwright is properly installed
-
-**"Element not found" errors**
-- Some sites may have dynamic content that loads slowly
-- Try increasing timeouts or adding custom wait conditions
-
-**Rate limiting from OpenAI**
-- The system includes automatic retry logic
-- Consider upgrading your OpenAI plan for higher limits
-
-### Debug Mode
-
-Enable verbose logging for detailed debugging:
-```bash
-python run.py https://example.com --verbose
-```
-
-## 🔐 Security Considerations
-
-- Never commit API keys to version control
-- Use environment variables or secure secret management
-- Be mindful of rate limits and API costs
-- Test only on applications you own or have permission to test
-
-## 🚧 Future Enhancements
-
-- [ ] Screenshot comparison for visual regression testing
-- [ ] Integration with CI/CD pipelines (GitHub Actions)
-- [ ] Custom test case DSL
-- [ ] Real-time dashboard for monitoring
-- [ ] Multi-browser support (Firefox, Safari)
-- [ ] Accessibility testing integration
-- [ ] Performance metrics collection
-
-## 📄 License
-
-This project is provided as-is for educational and testing purposes. Please ensure you have permission to test any websites you target.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📞 Support
-
-If you encounter issues:
-
-1. Check the troubleshooting section
-2. Review the logs in `qa_crawler.log`
-3. Ensure all dependencies are properly installed
-4. Verify your OpenAI API key is valid and has sufficient credits
-
----
-
-**Happy Testing!** 🎉
-
-The Autonomous QA Agent helps you discover bugs and issues in web applications through intelligent, AI-guided exploration. Use it to enhance your testing workflow and catch issues before they reach production. 
-
-# 🔍 QA AI - Autonomous Web Testing with Modal Recursion
-
-**Comprehensive website state fingerprinting and exhaustive UI exploration system with advanced modal handling capabilities.**
-
-## 🚀 Features
-
-### **Core Capabilities**
-- ✅ **Exhaustive UI State Fingerprinting** - Complete website state mapping in XML format
-- ✅ **Recursive Modal Exploration** - Deep exploration of nested modals and overlays  
-- ✅ **Session Management** - Organized results with error screenshots
-- ✅ **Interactive Element Discovery** - Comprehensive detection of buttons, links, inputs, forms
-- ✅ **Error Documentation** - Automatic screenshot capture for HTTP errors, console errors, and action failures
-- ✅ **State-Based Navigation** - Eliminates redundancy through unique state fingerprints
-
-### **Advanced Modal System** 🎭
-- **🔄 Recursive Modal Handling** - Handles modal → action → nested modal → explore chains
-- **📊 Modal State Tracking** - Prevents infinite loops and re-exploration
-- **⚡ Smart Dismissal** - ESC key, close buttons, backdrop clicks with fallbacks
-- **🎯 Context-Aware Testing** - Distinguishes modal elements from page elements
-- **📸 Visual Error Evidence** - Screenshots captured during modal interactions
-
-## 🏗️ Architecture
-
-### **Core Components**
-
+### MODULAR STRUCTURE
 ```
 qa-ai/
-├── 🔧 Core Exploration
-│   ├── minimal_explorer.py           # Main web exploration engine
-│   ├── enhanced_minimal_explorer.py  # Enhanced version with modal integration
-│   └── modal_explorer.py            # Comprehensive modal detection & recursion
-│
-├── 📊 State Management  
-│   ├── session_manager.py           # Session organization & screenshot management
-│   ├── state_fingerprint.py         # State hashing and comparison
-│   └── state_store.py              # State persistence and tracking
-│
-├── 🎯 Testing & Utilities
-│   ├── test_modal_recursion.py      # Modal recursion demonstration
-│   ├── test_defi_space.py          # Real-world website testing
-│   └── utils.py                    # Element extraction utilities
-│
-└── 📋 Configuration
-    ├── requirements.txt             # Python dependencies
-    └── run.py                      # Main execution script
+├── core/                    # Fundamental building blocks
+│   ├── browser/            # Browser management, events, lifecycle
+│   ├── session/            # Session persistence, storage
+│   └── state/              # State tracking, fingerprinting
+├── exploration/            # Exploration logic and strategies
+│   ├── strategies/         # systematic, intelligent, hybrid
+│   ├── elements/           # discovery, extraction, classification
+│   ├── actions/            # executor, retry_logic, validation
+│   └── modals/             # detection, handling
+├── reporting/              # Analysis and output generation
+│   ├── formatters/         # xml, json, html formatters
+│   ├── analyzers/          # bug, coverage, performance analysis
+│   └── exporters/          # file, api export mechanisms
+├── config/                 # Centralized configuration management
+├── explorers/              # Ready-to-use implementations
+│   ├── basic_explorer.py   # Simple systematic exploration
+│   ├── advanced_explorer.py # Full-featured with AI
+│   └── specialized_explorers/ # domain-specific (SPA, DeFi, etc.)
+├── scripts/                # Command-line utilities
+├── tests/                  # Organized unit and integration tests
+└── examples/               # Usage demonstrations
 ```
 
-## 🚀 Quick Start
+### CORE COMPONENTS
 
-### **1. Installation**
+**Browser Management (core/browser/)**
+- BrowserManager: Browser lifecycle and configuration
+- EventHandler: Console, network, error event handling
+- BrowserLifecycle: Setup, teardown, resource management
+
+**Session Management (core/session/)**
+- SessionManager: Exploration session persistence
+- SessionStorage: State storage and retrieval
+- SessionConfig: Session-specific configurations
+
+**State Management (core/state/)**
+- StateFingerprinter: UI state fingerprinting beyond URLs
+- StateTracker: State transition tracking and analysis
+- StateGraph: Complete state transition mapping
+
+**Exploration Strategies (exploration/strategies/)**
+- SystematicStrategy: BFS/DFS methodical exploration
+- IntelligentStrategy: AI-guided exploration using GPT-4
+- HybridStrategy: Combined systematic and intelligent approaches
+
+**Element Discovery (exploration/elements/)**
+- ElementExtractor: Interactive element discovery from DOM
+- ElementDiscovery: Live element discovery with visibility checks
+- ElementClassification: Element type and priority classification
+
+**Action Execution (exploration/actions/)**
+- ActionExecutor: Action execution with retry logic
+- RetryLogic: Adaptive timeout and failure handling
+- ActionValidation: Pre and post-action validation
+
+**Modal Handling (exploration/modals/)**
+- ModalDetector: Modal presence detection
+- ModalHandler: Modal interaction and dismissal
+
+**Reporting System (reporting/)**
+- XMLFormatter: ChatGPT-optimized XML output
+- JSONFormatter: Structured JSON reports
+- HTMLFormatter: Human-readable HTML reports
+- BugAnalyzer: Bug detection and categorization
+- CoverageAnalyzer: Exploration coverage analysis
+- PerformanceAnalyzer: Performance metrics and optimization
+
+## INSTALLATION
+
+**Prerequisites:**
+- Python 3.8+
+- OpenAI API Key (for GPT-4 access)
+- Internet connection
+
+**Setup:**
 ```bash
-git clone https://github.com/floor-licker/qa-ai.git
+# Clone repository
+git clone <repository_url>
 cd qa-ai
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Install Playwright browsers
+playwright install chromium
+
+# Set up environment
+cp env.template .env
+# Edit .env with your OPENAI_API_KEY
 ```
 
-### **2. Basic Usage**
-```bash
-# Test with modal recursion on a real website
-python test_modal_recursion.py
+## USAGE
 
-# Test comprehensive UI exploration
-python test_defi_space.py
-
-# Run full exploration session
-python run.py https://example.com
-```
-
-### **3. Session Results**
-Results are automatically organized in timestamped directories:
-```
-exploration_sessions/domain_YYYYMMDD_HHMMSS/
-├── reports/
-│   ├── session_report.json          # Comprehensive results
-│   ├── session_summary.txt          # Human-readable summary
-│   └── state_fingerprint_domain.xml # XML sitemap
-└── screenshots/                     # Error screenshots with context
-    ├── HHMMSS_console_error_details.png
-    ├── HHMMSS_action_error_timeout.png
-    └── HHMMSS_modal_action_error.png
-```
-
-## 🎭 Modal Recursion System
-
-### **Key Innovation: Exhaustive Modal Exploration**
-
-The system handles complex modal interactions that traditional crawlers miss:
-
+### BASIC USAGE
 ```python
-# Example: Deep modal exploration
-Page → Click Button → Modal A Opens
-        ↓
-Modal A → Fill Form → Click Submit → Modal B Opens (confirmation)
-          ↓  
-Modal B → Click Confirm → Modal C Opens (success)
-          ↓
-Modal C → All elements tested → Smart dismissal back to Page
+from explorers import BasicExplorer
+from config import ExplorationConfig
+
+# Create configuration
+config = ExplorationConfig.for_systematic_exploration()
+
+# Initialize explorer
+explorer = BasicExplorer("https://example.com", config)
+
+# Run exploration
+results = await explorer.explore()
 ```
 
-### **Modal Detection Capabilities**
-- **Standard Patterns**: `[role="dialog"]`, `.modal`, `.popup`, `.overlay`
-- **Framework Detection**: Bootstrap, jQuery UI, Ant Design, Chakra UI
-- **Dynamic Detection**: High z-index elements, positioned overlays
-- **Custom Patterns**: Wallet modals, drawer components, lightboxes
+### COMMAND LINE USAGE
+```bash
+# Basic exploration
+python scripts/run_exploration.py https://example.com
 
-### **Recursive Exploration Features**
-- **🔄 Depth Tracking**: Handles unlimited nesting levels
-- **📊 State Management**: Tracks explored modals to avoid re-testing
-- **⚡ Quick Dismissal**: Reuses known dismissal methods for efficiency
-- **🎯 Context Awareness**: Elements tested within modal scope
-- **📸 Error Capture**: Screenshots at every failure point
+# Quick scan
+python scripts/run_exploration.py https://example.com --quick-scan
 
-## 📊 Output Formats
+# Advanced exploration with AI
+python scripts/run_exploration.py https://example.com --strategy intelligent
 
-### **XML State Fingerprint**
-```xml
-<ApplicationStateFingerprint domain="example.com" total_elements="45" total_modals="3">
-  <MainPageElements>
-    <Buttons count="12"/>
-    <Links count="28"/>
-    <Inputs count="5"/>
-  </MainPageElements>
-  
-  <ModalExploration>
-    <TotalModalsDiscovered>3</TotalModalsDiscovered>
-    <ModalsFullyExplored>3</ModalsFullyExplored>
-    <TotalModalElements>18</TotalModalElements>
-    <ModalTypes>
-      <Dialog count="2"/>
-      <Popup count="1"/>
-    </ModalTypes>
-  </ModalExploration>
-</ApplicationStateFingerprint>
+# Custom configuration
+python scripts/run_exploration.py https://example.com \
+  --max-actions 100 \
+  --headless \
+  --output results.json
 ```
 
-### **Session Report (JSON)**
-```json
-{
-  "exploration_summary": {
-    "total_elements": 45,
-    "actions_performed": 63,
-    "modal_exploration": {
-      "total_modals_discovered": 3,
-      "modals_fully_explored": 3,
-      "total_modal_elements": 18
+### SPECIALIZED EXPLORERS
+```python
+from explorers.specialized_explorers import SPAExplorer, DeFiExplorer
+
+# Single Page Application exploration
+spa_explorer = SPAExplorer("https://react-app.com")
+spa_results = await spa_explorer.explore()
+
+# DeFi application exploration
+defi_explorer = DeFiExplorer("https://defi-app.com")
+defi_results = await defi_explorer.explore()
+```
+
+## CONFIGURATION
+
+### EXPLORATION CONFIGURATION
+```python
+from config import ExplorationConfig, StrategyConfig, ElementConfig
+
+config = ExplorationConfig(
+    strategy=StrategyConfig(
+        strategy=ExplorationStrategy.SYSTEMATIC,
+        max_actions_per_page=50,
+        max_depth=3,
+        breadth_first=True,
+        prioritize_forms=True
+    ),
+    elements=ElementConfig(
+        include_hidden=False,
+        min_element_size=10,
+        exclude_selectors=['.advertisement', '.tracking']
+    ),
+    max_total_actions=500,
+    max_session_duration=3600,
+    capture_screenshots_on_error=True
+)
+```
+
+### BROWSER CONFIGURATION
+```python
+from config import BrowserConfig, ViewportConfig
+
+browser_config = BrowserConfig(
+    headless=True,
+    viewport=ViewportConfig(width=1280, height=720),
+    timeout=30000,
+    user_agent="QA-Bot/2.0"
+)
+```
+
+### REPORTING CONFIGURATION
+```python
+from config import ReportingConfig, OutputFormat
+
+reporting_config = ReportingConfig(
+    formats=[OutputFormat.XML, OutputFormat.JSON, OutputFormat.HTML],
+    include_screenshots=True,
+    detailed_analysis=True,
+    export_path="./reports/"
+)
+```
+
+## EXPLORATION STRATEGIES
+
+### SYSTEMATIC STRATEGY
+**Purpose:** Methodical exploration of all interactive elements
+**Method:** BFS/DFS traversal with element prioritization
+**Use Case:** Comprehensive coverage, regression testing
+**Configuration:**
+```python
+config = ExplorationConfig.for_systematic_exploration()
+```
+
+### INTELLIGENT STRATEGY  
+**Purpose:** AI-guided exploration using GPT-4 insights
+**Method:** Context-aware action selection based on page analysis
+**Use Case:** Complex applications, business logic testing
+**Configuration:**
+```python
+config = ExplorationConfig.for_intelligent_exploration()
+```
+
+### HYBRID STRATEGY
+**Purpose:** Combined systematic and intelligent exploration
+**Method:** Systematic discovery with intelligent prioritization
+**Use Case:** Balanced coverage and efficiency
+
+## STATE-BASED EXPLORATION
+
+### UI STATE FINGERPRINTING
+**Components:**
+- URL and page content hash
+- Modal presence and state
+- Dynamic content state
+- Form field values and validation states
+- Navigation context and scroll position
+
+**State Fingerprint Structure:**
+```python
+UIState {
+    url: str,
+    page_hash: str,
+    modal_state: {
+        has_modal: bool,
+        modal_type: str,
+        modal_content_hash: str
+    },
+    dynamic_content: {
+        loading_states: List[str],
+        error_states: List[str],
+        content_hashes: Dict[str, str]
+    },
+    form_state: {
+        filled_fields: Dict[str, str],
+        validation_states: Dict[str, str],
+        submit_available: bool
+    },
+    navigation_state: {
+        breadcrumbs: List[str],
+        active_menu: str,
+        scroll_position: int
     }
-  },
-  "bugs_found": [...],
-  "warnings": [...],
-  "modal_exploration_results": {...}
 }
 ```
 
-## 🔧 Configuration
-
-### **Explorer Settings**
+### STATE TRANSITION TRACKING
+**StateTransition Structure:**
 ```python
-explorer = MinimalWebExplorer(
-    base_url="https://example.com",
-    max_actions_per_page=50,        # Limit actions per page
-    action_timeout=5000,            # Element interaction timeout
-    headless=True                   # Browser visibility
-)
+StateTransition {
+    from_state: str,        # Source state fingerprint
+    to_state: str,          # Destination state fingerprint  
+    action: Dict,           # Action that caused transition
+    timestamp: datetime,    # When transition occurred
+    success: bool,          # Whether transition was successful
+    execution_time: float,  # Action execution duration
+    observable_changes: List # Console logs, network activity
+}
 ```
 
-### **Modal Settings**
-```python
-modal_explorer = ModalExplorer()
-modal_explorer.modal_selectors = [
-    '[role="dialog"]', '.modal', '.popup',
-    '.wallet-connect', '[data-testid*="modal"]'
-]
+## BUG DETECTION
+
+### AUTOMATIC BUG DETECTION
+**Error Types Detected:**
+- HTTP errors (4xx, 5xx status codes)
+- JavaScript console errors and exceptions
+- Failed network requests
+- Navigation failures and timeouts
+- Form submission failures
+- Unexpected page redirects
+- Performance issues and slow loading
+
+### BUG CATEGORIZATION
+**Severity Levels:**
+- CRITICAL: Application crashes, security issues
+- HIGH: Broken functionality, failed transactions
+- MEDIUM: User experience issues, performance problems
+- LOW: Minor UI glitches, cosmetic issues
+
+### ERROR REPORTING
+**Screenshot Capture:**
+- Automatic screenshots on errors
+- Context-aware naming convention
+- Error details embedded in filename
+
+**Error Analysis:**
+- Error categorization and grouping
+- Root cause analysis
+- Reproduction steps generation
+
+## OUTPUT FORMATS
+
+### XML OUTPUT (ChatGPT Optimized)
+```xml
+<ExplorationReport domain="example.com" timestamp="2024-01-15T10:30:00Z">
+    <Summary>
+        <PagesExplored>5</PagesExplored>
+        <ActionsPerformed>45</ActionsPerformed>
+        <BugsFound>3</BugsFound>
+        <WarningsFound>8</WarningsFound>
+        <ExplorationDuration>180.5</ExplorationDuration>
+    </Summary>
+    <StateAnalysis>
+        <UniqueStatesDiscovered>12</UniqueStatesDiscovered>
+        <StateTransitions>28</StateTransitions>
+        <ModalStatesExplored>4</ModalStatesExplored>
+    </StateAnalysis>
+    <BugDetails>
+        <Bug severity="HIGH" type="navigation_failure">
+            <Description>Login button click timeout</Description>
+            <Location>https://example.com/login</Location>
+            <Screenshot>103045_action_timeout_login_button.png</Screenshot>
+        </Bug>
+    </BugDetails>
+</ExplorationReport>
 ```
 
-## 🎯 Use Cases
+### JSON OUTPUT (Structured Data)
+```json
+{
+    "exploration_summary": {
+        "total_pages_visited": 5,
+        "total_actions_performed": 45,
+        "bugs_found": 3,
+        "warnings": 8,
+        "exploration_duration": 180.5,
+        "state_statistics": {
+            "unique_states_discovered": 12,
+            "state_transitions": 28,
+            "modal_states_explored": 4
+        }
+    },
+    "bugs": [...],
+    "warnings": [...],
+    "state_graph": {...}
+}
+```
 
-### **1. Comprehensive QA Testing**
-- Discover all interactive elements including hidden modal content
-- Capture visual evidence of errors for debugging
-- Generate complete UI coverage reports
+## PERFORMANCE OPTIMIZATIONS
 
-### **2. Accessibility Auditing**
-- Test modal keyboard navigation (ESC key handling)
-- Verify ARIA labels and roles in modal contexts
-- Ensure proper focus management
+### ADAPTIVE TIMEOUTS
+**Dynamic Timeout Adjustment:**
+- Default actions: 5 seconds (6x faster than 30s)
+- Modal blocked elements: 2 seconds
+- Navigation: 8 seconds
+- Form submission: 10 seconds
 
-### **3. Security Testing**
-- Test modal injection vulnerabilities  
-- Verify modal state isolation
-- Check for modal-based XSS vectors
+### INTELLIGENT PRIORITIZATION
+**Element Priority Weights:**
+- Buttons: 10 (highest priority)
+- Links: 8
+- Form inputs: 6
+- Selects: 6
+- Generic elements: 3
 
-### **4. Performance Analysis**
-- Measure modal load times and interaction delays
-- Identify modal-related memory leaks
-- Test modal behavior under stress
+### BATCH PROCESSING
+**Optimization Features:**
+- Batch execution of actions (default: 5 elements)
+- Reduced state checks (every 3rd action)
+- Minimal delays (0.2-1.0s vs 2s)
+- Smart element skipping for failed elements
 
-## 🐛 Error Handling & Screenshots
+### PERFORMANCE RESULTS
+**Speed Improvements:**
+- 60x faster overall exploration
+- 6-15x faster element interactions
+- 2x faster page loading
+- 10x faster modal detection
 
-### **Automatic Screenshot Triggers**
-1. **HTTP Errors**: 4xx/5xx responses with context
-2. **Console Errors**: JavaScript errors and assertions  
-3. **Action Failures**: Element interaction timeouts/failures
-4. **Navigation Issues**: Page load failures and timeouts
-5. **Modal Errors**: Modal interaction and dismissal failures
+## ERROR HANDLING
 
-### **Screenshot Naming Convention**
+### RETRY STRATEGIES
+**Adaptive Retry Logic:**
+- Exponential backoff for transient failures
+- Maximum retry limits per action type
+- Fallback strategies for blocked elements
+- Graceful degradation on persistent failures
+
+### SCREENSHOT CAPTURE
+**Automatic Screenshot Triggers:**
+- HTTP errors with response codes
+- Console errors and JavaScript exceptions
+- Action execution failures and timeouts
+- Navigation failures
+- Modal interaction failures
+
+**Screenshot Naming Convention:**
 ```
 HHMMSS_error_type_context_details.png
-
 Examples:
-103045_console_error_modal_12ab34cd_payment_policy.png
-103122_action_error_main_page_button_timeout.png
-103201_modal_action_error_depth_2_nested_form.png
+103045_console_error_payment_form_validation.png
+103122_action_timeout_login_button_main_page.png
+103201_navigation_error_checkout_process.png
 ```
 
-## 🔬 Testing Examples
+## TESTING
 
-### **Test Modal Recursion**
+### UNIT TESTS
 ```bash
-python test_modal_recursion.py
-```
-Demonstrates recursive modal exploration with nested modal detection.
+# Run unit tests
+python -m pytest tests/unit/
 
-### **Test Real Website**
+# Run specific module tests
+python -m pytest tests/unit/core/
+python -m pytest tests/unit/exploration/
+python -m pytest tests/unit/reporting/
+```
+
+### INTEGRATION TESTS
 ```bash
-python test_defi_space.py
-```
-Tests comprehensive UI exploration on a complex DeFi application.
+# Run integration tests
+python -m pytest tests/integration/
 
-### **Custom Exploration**
+# Run specific integration tests
+python tests/integration/test_defi_space.py
+python tests/integration/test_session_with_screenshots.py
+```
+
+## DEVELOPMENT
+
+### EXTENDING THE SYSTEM
+
+**Adding New Exploration Strategy:**
 ```python
-from minimal_explorer import MinimalWebExplorer
-
-explorer = MinimalWebExplorer("https://your-site.com")
-results = await explorer.explore()
-
-print(f"Elements found: {len(results['discovered_elements'])}")
-print(f"Modals explored: {results['modal_exploration_results']['modals_fully_explored']}")
+# exploration/strategies/custom_strategy.py
+class CustomStrategy:
+    async def explore_page(self, page, elements):
+        # Implement custom exploration logic
+        pass
 ```
 
-## 🔍 Key Achievements
-
-### **Exhaustive UI Coverage**
-- **100% Interactive Element Discovery**: Buttons, links, inputs, forms, modals
-- **State-Based Exploration**: Unique fingerprints eliminate redundant testing
-- **Context-Aware Testing**: Modal elements tested within proper scope
-- **Visual Error Documentation**: Screenshots provide debugging context
-
-### **Modal Recursion Innovation** 
-- **Unlimited Nesting**: Handles modal → modal → modal chains
-- **Smart State Tracking**: Avoids infinite loops and redundant exploration  
-- **Adaptive Dismissal**: Multiple fallback strategies for modal closure
-- **Performance Optimized**: Quick dismissal for known modal patterns
-
-## 📈 Performance Metrics
-
-Typical exploration session results:
-- **Main Page Elements**: 10-50 interactive elements
-- **Modal Discovery**: 1-5 modals per complex application
-- **Modal Elements**: 5-20 elements per modal
-- **Exploration Time**: 30-120 seconds depending on complexity
-- **Screenshot Capture**: 5-15 error screenshots for debugging
-
-## 🛠️ Dependencies
-
-```txt
-playwright>=1.40.0    # Browser automation
-asyncio              # Asynchronous execution  
-dataclasses          # Data structures
-hashlib              # State fingerprinting
-logging              # Comprehensive logging
-pathlib              # File system operations
+**Adding New Element Extractor:**
+```python
+# exploration/elements/custom_extractor.py
+class CustomElementExtractor:
+    async def extract_from_page(self, page):
+        # Implement custom element extraction
+        pass
 ```
 
-## 🚀 Future Enhancements
+**Adding New Report Formatter:**
+```python
+# reporting/formatters/custom_formatter.py
+class CustomFormatter:
+    def format(self, results):
+        # Implement custom formatting logic
+        pass
+```
 
-- **🔄 Cross-Browser Testing**: Chrome, Firefox, Safari support
-- **🌐 Multi-Language Support**: International website testing
-- **📱 Mobile Modal Testing**: Touch interactions and responsive modals
-- **🤖 AI-Powered Element Detection**: Machine learning for custom patterns
-- **⚡ Parallel Modal Exploration**: Concurrent modal testing for speed
+### SPECIALIZED EXPLORERS
 
-## 📄 License
+**Creating Domain-Specific Explorer:**
+```python
+# explorers/specialized_explorers/ecommerce_explorer.py
+class EcommerceExplorer(BasicExplorer):
+    def __init__(self, base_url):
+        super().__init__(base_url)
+        # Add ecommerce-specific configuration
+        self.config.elements.priority_selectors.update({
+            '.add-to-cart': ActionPriority.HIGH,
+            '.checkout-button': ActionPriority.HIGH,
+            '.product-link': ActionPriority.MEDIUM
+        })
+```
+
+## COMMAND LINE REFERENCE
+
+### SCRIPTS
+```bash
+# Main exploration script
+python scripts/run_exploration.py [URL] [OPTIONS]
+
+# Result analysis
+python scripts/analyze_results.py [RESULTS_FILE]
+
+# Report generation
+python scripts/generate_reports.py [RESULTS_FILE] [FORMAT]
+```
+
+### OPTIONS
+```
+--strategy {systematic,intelligent,hybrid}  Exploration strategy
+--max-actions INTEGER                        Maximum total actions
+--max-actions-per-page INTEGER              Maximum actions per page
+--timeout INTEGER                           Session timeout (seconds)
+--headless                                  Run in headless mode
+--viewport WIDTHxHEIGHT                    Browser viewport size
+--output FILENAME                          Output file path
+--format {xml,json,html}                   Output format
+--verbose                                  Enable verbose logging
+--clear-state                              Clear previous state
+--quick-scan                               Use quick scan configuration
+```
+
+## TROUBLESHOOTING
+
+### COMMON ISSUES
+
+**OpenAI API Key Not Found**
+```bash
+# Set environment variable
+export OPENAI_API_KEY="your_key_here"
+
+# Or create .env file
+echo "OPENAI_API_KEY=your_key_here" > .env
+```
+
+**Playwright Browser Not Found**
+```bash
+# Install browsers
+playwright install chromium
+
+# Or install all browsers
+playwright install
+```
+
+**Element Not Found Errors**
+- Check element selectors in configuration
+- Increase action timeout
+- Enable detailed logging for debugging
+
+**Performance Issues**
+- Reduce max_actions_per_page
+- Enable batch processing
+- Use headless mode
+- Optimize element selectors
+
+## DEPENDENCIES
+
+### CORE DEPENDENCIES
+```
+playwright>=1.40.0     # Browser automation
+openai>=1.0.0         # GPT-4 integration  
+asyncio               # Asynchronous execution
+dataclasses           # Data structures
+```
+
+### OPTIONAL DEPENDENCIES
+```
+pytest>=7.0.0         # Testing framework
+black>=22.0.0         # Code formatting
+mypy>=1.0.0          # Type checking
+```
+
+## LICENSE
 
 MIT License - See LICENSE file for details.
 
-## 🤝 Contributing
+## VERSION HISTORY
+
+**v2.0.0** - Modular architecture implementation
+- Complete codebase restructuring
+- Domain-specific module organization  
+- Enhanced configuration management
+- Improved testing structure
+
+**v1.x** - Legacy monolithic implementation
+- Single-file explorer implementations
+- Basic functionality
+
+## CONTRIBUTING
 
 1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality  
-4. Submit a pull request
+2. Create feature branch: `git checkout -b feature-name`
+3. Follow modular architecture patterns
+4. Add tests for new functionality
+5. Update documentation
+6. Submit pull request
 
----
+## AI AGENT NOTES
 
-**🎉 Achievement: Complete exhaustive UI exploration system with recursive modal handling for comprehensive website testing!**
+**For AI agents and LLM models:**
+- This system uses modular architecture with clear separation of concerns
+- Each module has specific responsibilities and interfaces
+- Configuration is centralized in the config/ package
+- Core functionality is in core/, exploration logic in exploration/, reporting in reporting/
+- Ready-to-use implementations are in explorers/
+- All components follow consistent naming patterns and documentation standards
+- The system is designed for autonomous operation with minimal human intervention
+- State-based exploration provides comprehensive UI coverage beyond URL-based crawling
+- Performance optimizations enable rapid exploration while maintaining quality
