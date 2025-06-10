@@ -1,0 +1,84 @@
+<?xml version="1.0" ?>
+<ApplicationStateFingerprint domain="example.com" timestamp="2025-06-10T09:37:49.273201" total_states="1" total_transitions="0">
+  <Metadata>
+    <GeneratedBy>QA AI State-Based Explorer</GeneratedBy>
+    <Version>1.0</Version>
+    <Description>Complete UI state fingerprint map with transitions and console tracking</Description>
+  </Metadata>
+  <States count="1">
+    <State fingerprint="f01b5256a10b" type="page">
+      <URL>https://example.com/test</URL>
+      <PageHash>6e8601dbe61fefdfa3eccd0b81f70805</PageHash>
+      <InteractiveElements count="8">
+        <ElementType type="button" count="2">
+          <Element selector="button:has-text(&quot;Login&quot;)">
+            <Text>Login</Text>
+          </Element>
+          <Element selector="#load-data">
+            <Text>Load Data</Text>
+          </Element>
+        </ElementType>
+        <ElementType type="input" count="2">
+          <Element selector="input[name='email']" input_type="email">
+            <Name>email</Name>
+            <Placeholder>Enter email</Placeholder>
+          </Element>
+          <Element selector="input[name='password']" input_type="password">
+            <Name>password</Name>
+            <Placeholder>Password</Placeholder>
+          </Element>
+        </ElementType>
+        <ElementType type="link" count="3">
+          <Element selector="a:has-text(&quot;Home&quot;)">
+            <Text>Home</Text>
+            <Href>https://example.com/home</Href>
+          </Element>
+          <Element selector="a:has-text(&quot;Profile&quot;)">
+            <Text>Profile</Text>
+            <Href>https://example.com/profile</Href>
+          </Element>
+          <Element selector="a:has-text(&quot;Settings&quot;)">
+            <Text>Settings</Text>
+            <Href>https://example.com/settings</Href>
+          </Element>
+        </ElementType>
+        <ElementType type="select" count="1">
+          <Element selector="select[name='category']">
+            <Name>category</Name>
+          </Element>
+        </ElementType>
+      </InteractiveElements>
+      <ConsoleState has_activity="True" health="normal">
+        <LogSummary total_logs="1" has_errors="False" has_warnings="False">
+          <CountsByType>
+            <Count type="error">0</Count>
+            <Count type="warning">0</Count>
+            <Count type="info">0</Count>
+            <Count type="debug">0</Count>
+          </CountsByType>
+        </LogSummary>
+      </ConsoleState>
+      <FormState form_count="1">
+        <FormTypes>
+          <Type>post</Type>
+        </FormTypes>
+      </FormState>
+      <NavigationState/>
+    </State>
+  </States>
+  <Transitions count="0"/>
+  <Statistics>
+    <StateStatistics>
+      <StateType name="page">1</StateType>
+    </StateStatistics>
+    <TransitionStatistics>
+      <SuccessfulTransitions>0</SuccessfulTransitions>
+      <FailedTransitions>0</FailedTransitions>
+    </TransitionStatistics>
+    <ConsoleStatistics>
+      <StatesWithConsoleActivity>1</StatesWithConsoleActivity>
+      <StatesWithCriticalIssues>0</StatesWithCriticalIssues>
+      <ConsoleCoveragePercentage>100.00%</ConsoleCoveragePercentage>
+    </ConsoleStatistics>
+  </Statistics>
+</ApplicationStateFingerprint>

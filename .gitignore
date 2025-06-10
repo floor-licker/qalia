@@ -1,0 +1,91 @@
+# QA AI Project - Git Ignore Rules
+
+# Large log files
+*.log
+qa_crawler.log
+qa_ai_session.log
+coordinated_exploration.log
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Screenshot files (can be large)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+headless_screenshot.png
+
+# Session data and exploration results (can be regenerated)
+exploration_sessions/
+site_maps/
+*.json
+qa_results.json
+state_store.json
+coordinated_results.json
+qa_session_report.txt
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json 
