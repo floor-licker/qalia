@@ -9,7 +9,11 @@ import asyncio
 import logging
 import argparse
 import time
+import sys
 from pathlib import Path
+
+# Add parent directory to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Configure logging with better formatting
 logging.basicConfig(
@@ -47,17 +51,19 @@ async def run_exploration(base_url: str, options: dict = None) -> dict:
     Returns:
         Dictionary containing exploration results and session info
     """
-    from explorer import WebExplorer
+    from explorers import BasicExplorer as WebExplorer
+    from explorers.basic_explorer import ExplorationConfig
     
-    # Create explorer with session management
-    explorer_options = {
-        'headless': options.get('headless', True),
-        'max_depth': options.get('max_depth', 3),
-        'exploration_timeout': options.get('timeout', 300),
-        'action_timeout': options.get('action_timeout', 5000)
-    }
+    # Create exploration configuration
+    config = ExplorationConfig(
+        headless=options.get('headless', True),
+        exploration_timeout=options.get('timeout', 300),
+        action_timeout=options.get('action_timeout', 5000),
+        max_actions_per_page=options.get('max_depth', 3) * 20,  # Use max_depth as a multiplier
+        capture_screenshots=True
+    )
     
-    explorer = WebExplorer(base_url=base_url, **explorer_options)
+    explorer = WebExplorer(base_url=base_url, config=config)
     
     logger.info(f"🚀 Starting exploration of {base_url}")
     logger.info(f"📁 Session: {explorer.session_manager.session_id}")

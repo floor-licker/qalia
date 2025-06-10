@@ -8,12 +8,9 @@ This package contains the fundamental building blocks for web exploration:
 """
 
 from .browser.manager import BrowserManager, BrowserConfig
-from .session.manager import SessionManager, SessionConfig
-from .state.fingerprinting import StateFingerprinter
-from .state.tracking import StateTracker
+from .session.manager import SessionManager
 
 __all__ = [
     'BrowserManager', 'BrowserConfig',
-    'SessionManager', 'SessionConfig', 
-    'StateFingerprinter', 'StateTracker'
+    'SessionManager'
 ] 

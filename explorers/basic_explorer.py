@@ -22,7 +22,7 @@ from utils import (
     SessionReporter,
     NavigationUtils
 )
-from session_manager import SessionManager
+from core import SessionManager
 
 # Configure logging
 logging.basicConfig(

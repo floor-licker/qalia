@@ -7,12 +7,8 @@ Different explorer implementations for various use cases:
 - SpecializedExplorers: Domain-specific explorers (SPA, ecommerce, DeFi)
 """
 
-from .basic_explorer import BasicExplorer
-from .advanced_explorer import AdvancedExplorer
-from .specialized_explorers.spa_explorer import SPAExplorer
-from .specialized_explorers.defi_explorer import DeFiExplorer
+from .basic_explorer import CleanWebExplorer as BasicExplorer
 
 __all__ = [
-    'BasicExplorer', 'AdvancedExplorer',
-    'SPAExplorer', 'DeFiExplorer'
+    'BasicExplorer'
 ] 
