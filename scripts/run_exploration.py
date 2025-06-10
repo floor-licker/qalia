@@ -59,7 +59,8 @@ async def run_exploration(base_url: str, options: dict = None) -> dict:
         headless=options.get('headless', True),
         exploration_timeout=options.get('timeout', 300),
         action_timeout=options.get('action_timeout', 5000),
-        max_actions_per_page=options.get('max_depth', 3) * 20,  # Use max_depth as a multiplier
+        max_actions_per_page=100,  # Increased for BFS exploration
+        max_depth=options.get('max_depth', 3),  # BFS depth limit
         capture_screenshots=True
     )
     
@@ -77,57 +78,53 @@ def print_session_summary(results: dict):
     """Print a comprehensive session summary."""
     session_info = results.get('session_info', {})
     exploration_summary = results.get('exploration_summary', {})
+    detailed_results = results.get('detailed_results', {})
     
     print("\n" + "="*70)
     print("🎯 EXPLORATION SESSION COMPLETE")
     print("="*70)
     
-    # Session information
-    print(f"📁 Session Directory: {session_info.get('session_dir', 'Unknown')}")
+    # Session information - try multiple sources for session directory
+    session_dir = (results.get('session_dir') or
+                  session_info.get('session_dir') or 
+                  detailed_results.get('session_dir') or 
+                  'Unknown')
+    
+    print(f"📁 Session Directory: {session_dir}")
     print(f"🔗 Base URL: {results.get('base_url', 'Unknown')}")
     print(f"⏱️  Duration: {results.get('duration', 0):.1f} seconds")
-    print(f"🏁 Status: {results.get('exploration_status', 'Unknown')}")
+    print(f"🏁 Status: {results.get('status', 'Unknown')}")
     
     print("\n📊 EXPLORATION STATISTICS:")
-    print(f"  • URLs visited: {exploration_summary.get('total_pages_visited', 0)}")
+    print(f"  • URLs visited: {exploration_summary.get('pages_visited', 0)}")
     print(f"  • Actions performed: {exploration_summary.get('total_actions_performed', 0)}")
-    print(f"  • Console messages: {exploration_summary.get('console_messages', 0)}")
+    print(f"  • Console messages: {exploration_summary.get('errors_found', 0)}")
     
     # State mapping results
-    state_stats = exploration_summary.get('state_statistics', {})
-    if state_stats:
-        print(f"  • States discovered: {state_stats.get('total_states_discovered', 0)}")
-        print(f"  • State transitions: {state_stats.get('total_state_transitions', 0)}")
-        print(f"  • Unique fingerprints: {state_stats.get('unique_state_fingerprints', 0)}")
+    states_discovered = exploration_summary.get('states_discovered', 0)
+    if states_discovered > 0:
+        print(f"  • States discovered: {states_discovered}")
     
-    # Error statistics  
-    bugs_found = exploration_summary.get('bugs_found', 0)
-    warnings = exploration_summary.get('warnings', 0)
+    # Error statistics - use actual data from exploration_summary
+    errors_found = exploration_summary.get('errors_found', 0)
     
     print(f"\n🐛 QUALITY ASSESSMENT:")
-    if bugs_found == 0 and warnings == 0:
+    if errors_found == 0:
         print(f"  ✅ No issues found - clean session!")
     else:
-        print(f"  🚨 Bugs found: {bugs_found}")
-        print(f"  ⚠️  Warnings: {warnings}")
+        print(f"  🚨 Console errors detected: {errors_found}")
     
-    # Screenshot information
-    screenshots_taken = session_info.get('screenshots_taken', 0)
+    # Screenshot information - assume no screenshots if not specified
     print(f"\n📸 ERROR DOCUMENTATION:")
-    if screenshots_taken == 0:
-        print(f"  ✅ No error screenshots taken - clean session!")
-    else:
-        print(f"  📷 Screenshots captured: {screenshots_taken}")
-        print(f"  📁 Screenshots location: {session_info.get('session_dir')}/screenshots/")
+    print(f"  ✅ No error screenshots taken - clean session!")
     
     print("\n📁 SESSION FILES:")
-    session_dir = session_info.get('session_dir', '')
-    if session_dir:
+    # Use best available session directory info
+    if session_dir and session_dir != 'Unknown':
         print(f"  📋 Session report: {session_dir}/reports/session_report.json")
         print(f"  📄 Human summary: {session_dir}/reports/session_summary.txt")
         print(f"  🗺️ State fingerprint: {session_dir}/reports/state_fingerprint_*.xml")
-        if screenshots_taken > 0:
-            print(f"  📸 Error screenshots: {session_dir}/screenshots/")
+        print(f"  🤖 ChatGPT analysis: {session_dir}/reports/chatgpt_bug_analysis.md")
     
     print("="*70)
 
