@@ -88,9 +88,13 @@ python main.py $CMD_ARGS\n\
 # Set outputs for GitHub Actions\n\
 if [ -d "/github/workspace/$OUTPUT_DIR" ]; then\n\
   TEST_COUNT=$(find "/github/workspace/$OUTPUT_DIR" -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" | wc -l)\n\
-  echo "tests_generated=$TEST_COUNT" >> $GITHUB_OUTPUT\n\
-  echo "report_path=/github/workspace/$OUTPUT_DIR/qa-ai-summary.md" >> $GITHUB_OUTPUT\n\
-  echo "test_results=/github/workspace/$OUTPUT_DIR/test-results.json" >> $GITHUB_OUTPUT\n\
+  \n\
+  # Only set GitHub outputs if the variable exists\n\
+  if [ ! -z "$GITHUB_OUTPUT" ]; then\n\
+    echo "tests_generated=$TEST_COUNT" >> "$GITHUB_OUTPUT"\n\
+    echo "report_path=/github/workspace/$OUTPUT_DIR/qa-ai-summary.md" >> "$GITHUB_OUTPUT"\n\
+    echo "test_results=/github/workspace/$OUTPUT_DIR/test-results.json" >> "$GITHUB_OUTPUT"\n\
+  fi\n\
   \n\
   echo "✅ Generated $TEST_COUNT test files"\n\
   echo "📁 Output saved to $OUTPUT_DIR/"\n\
