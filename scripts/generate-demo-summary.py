@@ -46,7 +46,7 @@ def generate_demo_summary():
 Generated test files and reports are available as workflow artifacts:
 1. Click on the **Summary** tab above
 2. Scroll down to **Artifacts** section
-3. Download the **qa-ai-test-results** archive
+3. Download the **qalia-test-results** archive
 
 ### Artifact Contents
 - **Test Files**: Ready-to-run test cases for your CI/CD pipeline

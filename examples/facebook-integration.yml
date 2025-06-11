@@ -1,5 +1,5 @@
 # Example: How Facebook would integrate QA AI
-# File: .github/workflows/qa-ai-testing.yml in Facebook's repository
+# File: .github/workflows/qalia-testing.yml in Facebook's repository
 
 name: QA AI - Automated Testing
 
@@ -41,7 +41,7 @@ jobs:
         
     # Step 2: Run QA AI on deployed Facebook
     - name: Run QA AI Testing
-      uses: floor-licker/qa-ai@v1
+      uses: floor-licker/qalia@v1
       with:
         app_url: 'https://facebook-staging.example.com'
         max_depth: 5
@@ -55,7 +55,7 @@ jobs:
     - name: Process QA Results
       run: |
         echo "📊 QA AI testing completed!"
-        echo "Generated tests can be found in qa-ai-tests/"
+        echo "Generated tests can be found in qalia-tests/"
         
     # Step 4: Notify team
     - name: Notify on Slack
@@ -78,5 +78,5 @@ jobs:
             repo: context.repo.repo,
             title: '🚨 QA AI found issues in latest deployment',
             body: 'QA AI automated testing has detected issues. Check the workflow run for details.',
-            labels: ['qa-ai', 'bug', 'needs-investigation']
+            labels: ['qalia', 'bug', 'needs-investigation']
           }); 

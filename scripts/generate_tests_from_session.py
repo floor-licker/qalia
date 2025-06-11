@@ -168,7 +168,7 @@ def print_generation_summary(summary: Dict[str, Any]) -> None:
 async def generate_tests_main():
     """Main test generation function."""
     parser = argparse.ArgumentParser(
-        description='Generate test cases from QA-AI exploration sessions',
+        description='Generate test cases from Qalia exploration sessions',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

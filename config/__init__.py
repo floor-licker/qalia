@@ -1,7 +1,7 @@
 """
 Configuration Management
 
-Centralized configuration for all QA-AI components:
+Centralized configuration for all Qalia components:
 - Exploration configurations
 - Browser configurations  
 - Reporting configurations

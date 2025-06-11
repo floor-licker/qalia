@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Automated Test Case Generation** module converts exploration session data into runnable test files for multiple testing frameworks. This bridges the gap between discovery and automation by creating production-ready test suites from your QA-AI exploration sessions.
+The **Automated Test Case Generation** module converts exploration session data into runnable test files for multiple testing frameworks. This bridges the gap between discovery and automation by creating production-ready test suites from your Qalia exploration sessions.
 
 ## Key Features
 
@@ -115,7 +115,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Wallet Integration Tests
  * 
- * Generated from QA-AI exploration session
+ * Generated from Qalia exploration session
  * Base URL: https://defi.space
  */
 

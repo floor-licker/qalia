@@ -31,7 +31,7 @@ jobs:
         
     # Run QA AI
     - name: QA AI Analysis
-      uses: floor-licker/qa-ai@v1
+      uses: floor-licker/qalia@v1
       with:
         app_url: 'http://localhost:3000'
         openai_api_key: ${{ secrets.OPENAI_API_KEY }}
@@ -58,7 +58,7 @@ QA AI will:
 ### E-commerce Site
 ```yaml
 - name: QA AI E-commerce Testing
-  uses: floor-licker/qa-ai@v1
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://mystore-staging.com'
     max_depth: 5  # Deep exploration for shopping flows
@@ -68,7 +68,7 @@ QA AI will:
 ### Dashboard App
 ```yaml
 - name: QA AI Dashboard Testing  
-  uses: floor-licker/qa-ai@v1
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://admin.myapp.com'
     max_depth: 3
@@ -78,7 +78,7 @@ QA AI will:
 ### SaaS Platform
 ```yaml
 - name: QA AI SaaS Testing
-  uses: floor-licker/qa-ai@v1
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://app.mysaas.com'
     max_depth: 4
@@ -97,7 +97,7 @@ QA AI will:
 | `timeout` | Max time (seconds) | `300` |
 | `headless` | Headless browser | `true` |
 | `frameworks` | Test frameworks | `playwright,cypress,jest` |
-| `output_dir` | Test output directory | `qa-ai-tests` |
+| `output_dir` | Test output directory | `qalia-tests` |
 | `run_tests` | Execute generated tests | `true` |
 
 ---
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: QA AI Testing
-      uses: floor-licker/qa-ai@v1
+      uses: floor-licker/qalia@v1
       with:
         app_url: 'https://staging.myapp.com'
         
@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deep QA Analysis
-      uses: floor-licker/qa-ai@v1
+      uses: floor-licker/qalia@v1
       with:
         app_url: 'https://myapp.com'
         max_depth: 8  # Very deep exploration
@@ -157,7 +157,7 @@ strategy:
 
 steps:
 - name: QA AI - ${{ matrix.environment }}
-  uses: floor-licker/qa-ai@v1
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://${{ matrix.environment }}.myapp.com'
 ```
@@ -218,9 +218,9 @@ steps:
 - Adjust `max_depth` for your app complexity
 
 ### Getting Help
-- 📖 [Full Documentation](https://github.com/floor-licker/qa-ai/wiki)
-- 💬 [Discord Community](https://discord.gg/qa-ai)
-- 🐛 [Report Issues](https://github.com/floor-licker/qa-ai/issues)
+- 📖 [Full Documentation](https://github.com/floor-licker/qalia/wiki)
+- 💬 [Discord Community](https://discord.gg/qalia)
+- 🐛 [Report Issues](https://github.com/floor-licker/qalia/issues)
 
 ---
 

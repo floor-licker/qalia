@@ -627,7 +627,7 @@ class TestCaseGenerator:
 /**
  * {suite.description}
  * 
- * Generated from QA-AI exploration session
+ * Generated from Qalia exploration session
  * Base URL: {suite.base_url}
  * Generated: {datetime.now().isoformat()}
  */
@@ -703,7 +703,7 @@ test.describe('{suite.name}', () => {{
         content = f'''/**
  * {suite.description}
  * 
- * Generated from QA-AI exploration session
+ * Generated from Qalia exploration session
  * Base URL: {suite.base_url}
  * Generated: {datetime.now().isoformat()}
  */
@@ -765,7 +765,7 @@ describe('{suite.name}', () => {{
         content = f'''/**
  * {suite.description}
  * 
- * Generated from QA-AI exploration session
+ * Generated from Qalia exploration session
  * Base URL: {suite.base_url}
  * Generated: {datetime.now().isoformat()}
  */
@@ -882,9 +882,9 @@ export default defineConfig({{
             # Generate package.json
             package_path = output_dir / "package.json"
             package_content = f'''{{
-  "name": "qa-ai-generated-tests",
+  "name": "qalia-generated-tests",
   "version": "1.0.0",
-  "description": "Auto-generated tests from QA-AI exploration",
+  "description": "Auto-generated tests from Qalia exploration",
   "scripts": {{
     "test": "playwright test",
     "test:headed": "playwright test --headed",

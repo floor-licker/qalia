@@ -1,4 +1,4 @@
-# QA AI Configuration File
+# Qalia Configuration File
 # Defines how to deploy and test your application
 
 deployment:
@@ -28,7 +28,7 @@ deployment:
   localhost:
     base_url: "http://localhost:3000"
 
-# QA AI Exploration Settings
+# Qalia Exploration Settings
 exploration:
   headless: true
   max_depth: 5

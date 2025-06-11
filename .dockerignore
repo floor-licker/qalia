@@ -34,7 +34,7 @@ generated_tests/
 exploration_sessions/
 screenshots/
 site_maps/
-qa_ai_session.log
+qalia_session.log
 
 # Development files
 .env

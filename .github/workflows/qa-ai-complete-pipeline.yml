@@ -11,7 +11,7 @@ env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  qa-ai-pipeline:
+  qalia-pipeline:
     runs-on: ubuntu-latest
     
     steps:
@@ -48,7 +48,7 @@ jobs:
     # 3. Install QA AI Dependencies
     - name: Install QA AI Dependencies
       run: |
-        cd qa-ai
+        cd qalia
         pip install -r requirements.txt
         playwright install chromium
 
@@ -57,7 +57,7 @@ jobs:
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
-        cd qa-ai
+        cd qalia
         python main.py http://localhost:3000 \
           --headless \
           --max-depth 5 \
@@ -106,8 +106,8 @@ jobs:
       uses: actions/upload-artifact@v3
       if: always()
       with:
-        name: qa-ai-session
-        path: qa-ai/exploration_sessions/
+        name: qalia-session
+        path: qalia/exploration_sessions/
 
     # 9. Comment on PR with Results
     - name: Comment Test Results on PR

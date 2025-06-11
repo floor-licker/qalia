@@ -29,7 +29,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('qa_ai_complete_session.log')
+        logging.FileHandler('qalia_complete_session.log')
     ]
 )
 

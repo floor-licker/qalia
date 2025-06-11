@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /qa-ai
+WORKDIR /qalia
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
@@ -45,7 +45,7 @@ MAX_DEPTH="${INPUT_MAX_DEPTH:-3}"\n\
 TIMEOUT="${INPUT_TIMEOUT:-300}"\n\
 HEADLESS="${INPUT_HEADLESS:-true}"\n\
 FRAMEWORKS="${INPUT_FRAMEWORKS:-playwright,cypress,jest}"\n\
-OUTPUT_DIR="${INPUT_OUTPUT_DIR:-qa-ai-tests}"\n\
+OUTPUT_DIR="${INPUT_OUTPUT_DIR:-qalia-tests}"\n\
 RUN_TESTS="${INPUT_RUN_TESTS:-true}"\n\
 \n\
 echo "🤖 QA AI Docker Container Starting..."\n\
@@ -179,7 +179,7 @@ except Exception as e:\n\
   echo "Generated test files and reports are available as workflow artifacts:" >> "$SUMMARY_FILE"\n\
   echo "1. Click on the **Summary** tab above" >> "$SUMMARY_FILE"\n\
   echo "2. Scroll down to **Artifacts** section" >> "$SUMMARY_FILE"\n\
-  echo "3. Download the **qa-ai-test-results** archive" >> "$SUMMARY_FILE"\n\
+  echo "3. Download the **qalia-test-results** archive" >> "$SUMMARY_FILE"\n\
   echo "" >> "$SUMMARY_FILE"\n\
   echo "### Artifact Contents" >> "$SUMMARY_FILE"\n\
   echo "- **Test Files**: Ready-to-run test cases for your CI/CD pipeline" >> "$SUMMARY_FILE"\n\

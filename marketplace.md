@@ -15,7 +15,7 @@
 
 ```yaml
 - name: QA AI Testing
-  uses: floor-licker/qa-ai@v1
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://your-app.com'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}

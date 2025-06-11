@@ -28,7 +28,7 @@ jobs:
         
     # Run QA AI on your deployed app
     - name: Run QA AI Analysis
-      uses: floor-licker/qa-ai@v1
+      uses: floor-licker/qalia@v1
       with:
         app_url: 'http://localhost:3000'  # Your app URL
         max_depth: 3

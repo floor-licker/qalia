@@ -34,7 +34,7 @@ echo -e "${YELLOW}🧹 Auto-cleaning Docker space...${NC}"
 ./scripts/cleanup-docker.sh >/dev/null 2>&1 || echo -e "${YELLOW}⚠️  Cleanup had some warnings (continuing anyway)${NC}"
 
 # Set default values
-WORKFLOW="qa-ai-local-test"
+WORKFLOW="qalia-local-test"
 SECRETS_FILE=".github/secrets.env"
 EVENT="push"
 
@@ -57,14 +57,14 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -w, --workflow    Workflow to run (default: qa-ai-local-test)"
+            echo "  -w, --workflow    Workflow to run (default: qalia-local-test)"
             echo "  -e, --event       Event type (default: push)"
             echo "  -s, --secrets     Secrets file (default: .github/secrets.env)"
             echo "  -h, --help        Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0                                    # Run default workflow"
-            echo "  $0 -w qa-ai-complete-pipeline        # Run full pipeline"
+            echo "  $0 -w qalia-complete-pipeline        # Run full pipeline"
             echo "  $0 -e workflow_dispatch              # Manual trigger"
             exit 0
             ;;

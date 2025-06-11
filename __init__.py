@@ -1,5 +1,5 @@
 """
-QA-AI: Autonomous Website Testing and Exploration
+Qalia: Autonomous Website Testing and Exploration
 
 A modular, intelligent system for automated website testing using Playwright and AI.
 

@@ -3,7 +3,7 @@
 # Large log files
 *.log
 qa_crawler.log
-qa_ai_session.log
+qalia_session.log
 coordinated_exploration.log
 
 # Environment files

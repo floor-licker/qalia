@@ -2,7 +2,7 @@
 """
 Basic Usage Example
 
-Demonstrates how to use the modular QA-AI system for simple website exploration.
+Demonstrates how to use the modular Qalia system for simple website exploration.
 """
 
 import asyncio

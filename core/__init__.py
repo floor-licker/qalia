@@ -1,5 +1,5 @@
 """
-Core QA-AI Components
+Core Qalia Components
 
 This package contains the fundamental building blocks for web exploration:
 - Browser management and lifecycle

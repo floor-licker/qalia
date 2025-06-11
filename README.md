@@ -1,4 +1,4 @@
-# 🤖 QA AI - Autonomous Website Testing
+# 🤖 QALIA - Autonomous UI Testing, starts with QA et ca fini avec IA
 
 **Add AI-powered testing to any webapp in 5 minutes**
 
@@ -10,20 +10,20 @@ A GitHub Action that automatically explores your web application, generates comp
 
 Add this to your `.github/workflows/qa-testing.yml`:
 ```yaml
-- name: QA AI Testing
-  uses: floor-licker/qa-ai@v1
+- name: Qalia Testing
+  uses: floor-licker/qalia@v1
   with:
     app_url: 'https://your-app.com'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-**That's it!** QA AI will explore your app and generate Playwright, Cypress, and Jest tests automatically.
+**That's it!** Qalia will explore your app and generate Playwright, Cypress, and Jest tests automatically.
 
 📖 **[Full Integration Guide →](INTEGRATION_GUIDE.md)**
 
 ---
 
-## 🎯 What QA AI Does
+## 🎯 What Qalia Does
 
 1. **🔍 Explores** your webapp autonomously using AI
 2. **🧠 Analyzes** user journeys and interaction patterns  
@@ -37,7 +37,7 @@ Add this to your `.github/workflows/qa-testing.yml`:
 
 ### MODULAR STRUCTURE
 ```
-qa-ai/
+qalia/
 ├── core/                    # Fundamental building blocks
 │   ├── browser/            # Browser management, events, lifecycle
 │   ├── session/            # Session persistence, storage
@@ -116,7 +116,7 @@ qa-ai/
 ```bash
 # Clone repository
 git clone <repository_url>
-cd qa-ai
+cd qalia
 
 # Install dependencies
 pip install -r requirements.txt

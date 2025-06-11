@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  qa-ai-full-test:
+  qalia-full-test:
     runs-on: ubuntu-latest
     
     steps:

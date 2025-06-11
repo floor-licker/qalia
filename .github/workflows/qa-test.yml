@@ -12,7 +12,7 @@ jobs:
     
     steps:
       - name: Test with QA AI
-        uses: floor-licker/qa-ai@v1.0.0
+        uses: floor-licker/qalia@v1.0.0
         with:
           app_url: 'https://floor-licker.github.io/demo-web-app/'
           openai_api_key: ${{ secrets.OPENAI_API_KEY }} 
