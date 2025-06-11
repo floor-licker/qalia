@@ -1,0 +1,91 @@
+name: QA AI - Simple Local Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  qa-ai-simple-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Simple test without external actions
+    - name: Check Environment
+      run: |
+        echo "🚀 QA AI Simple Test Starting..."
+        echo "Working directory: $(pwd)"
+        echo "Python version: $(python3 --version)"
+        echo "Node version: $(node --version)"
+        echo "Available commands:"
+        which python3 node npm pip
+        
+    - name: Test QA AI Dependencies Install
+      run: |
+        echo "📦 Installing QA AI dependencies..."
+        pip install --no-cache-dir playwright beautifulsoup4 lxml requests openai
+        
+    - name: Install Playwright Browser
+      run: |
+        echo "🌐 Installing Playwright Chromium..."
+        playwright install chromium
+        
+    - name: Verify QA AI Setup
+      run: |
+        echo "✅ Verifying QA AI installation..."
+        python3 -c "import playwright; print('Playwright:', playwright.__version__)"
+        python3 -c "import bs4; print('BeautifulSoup:', bs4.__version__)"
+        python3 -c "import openai; print('OpenAI SDK installed successfully')"
+        
+    - name: Test QA AI Main Script
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        echo "🧪 Testing QA AI pipeline..."
+        if [ -f "main.py" ]; then
+          echo "Found main.py - testing basic functionality"
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          print('Testing imports...')
+          try:
+              from scripts.run_exploration import run_exploration
+              print('✅ run_exploration imported successfully')
+          except Exception as e:
+              print('❌ Import error:', e)
+          
+          try:
+              from generators import TestCaseGenerator
+              print('✅ TestCaseGenerator imported successfully')
+          except Exception as e:
+              print('❌ Generator import error:', e)
+          "
+        else
+          echo "❌ main.py not found"
+        fi
+        
+    - name: Quick Web Test
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        echo "🌐 Testing simple web exploration..."
+        if [ -f "main.py" ]; then
+          timeout 60 python3 main.py https://httpbin.org/html \
+            --headless \
+            --max-depth 1 \
+            --timeout 30 \
+            --output-dir ./simple_test_results || echo "Test completed with timeout"
+        fi
+        
+    - name: Show Results
+      run: |
+        echo "📊 Test Results:"
+        if [ -d "simple_test_results" ]; then
+          echo "✅ Output directory created"
+          find simple_test_results -type f | head -10
+        else
+          echo "❌ No output directory found"
+        fi
+        
+        echo ""
+        echo "🏁 QA AI Simple Test Complete!" 

@@ -127,6 +127,10 @@ class ErrorHandler:
             status_code = response.status
             url = response.url
             
+            # Skip logging successful responses (200-299) - these are not errors!
+            if 200 <= status_code < 300:
+                return None
+            
             # Categorize error
             severity = self._categorize_http_error(status_code)
             error_type = self._get_http_error_type(status_code)
@@ -158,7 +162,11 @@ class ErrorHandler:
             # Call custom handlers
             await self._call_custom_handlers('http_error', error_record)
             
-            logger.warning(f"🌐 HTTP Error [{severity}]: {status_code} - {url}")
+            # Only log actual HTTP errors (400+) with appropriate log level
+            if status_code >= 500:
+                logger.error(f"🚨 HTTP Server Error: {status_code} - {url}")
+            elif status_code >= 400:
+                logger.warning(f"⚠️ HTTP Client Error: {status_code} - {url}")
             
             return error_record
             

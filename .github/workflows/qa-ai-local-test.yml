@@ -1,0 +1,73 @@
+name: QA AI - Local Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  qa-ai-local-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Basic Setup
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    # 2. Install QA AI Dependencies (Simplified)
+    - name: Install QA AI Dependencies
+      run: |
+        pip install playwright beautifulsoup4 lxml openai
+        playwright install chromium
+
+    # 3. Test QA AI on a public site (no deployment needed)
+    - name: Run QA AI Pipeline (Public Site Test)
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        # Test against a simple public site instead of localhost
+        python main.py https://example.com \
+          --headless \
+          --max-depth 2 \
+          --timeout 120 \
+          --output-dir ./test_results
+
+    # 4. Quick Test Execution (Playwright only for speed)
+    - name: Run Generated Playwright Tests
+      run: |
+        if [ -d "test_results/playwright" ]; then
+          cd test_results/playwright
+          npm install
+          npx playwright test --reporter=line
+        else
+          echo "No Playwright tests generated"
+        fi
+
+    # 5. Show Results
+    - name: Display Test Results
+      run: |
+        echo "=== QA AI Local Test Results ==="
+        if [ -f "test_results/generation_summary.json" ]; then
+          echo "📊 Test Generation Summary:"
+          cat test_results/generation_summary.json | head -20
+        else
+          echo "❌ No test summary found"
+        fi
+        
+        echo ""
+        echo "📁 Generated Files:"
+        find test_results -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" 2>/dev/null || echo "No test files found" 
