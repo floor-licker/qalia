@@ -2,8 +2,8 @@
  * Test suite for  functionality
  * 
  * Generated from QA-AI exploration session
- * Base URL: https://defi.space
- * Generated: 2025-06-11T11:49:49.528487
+ * Base URL: https://httpbin.org/html
+ * Generated: 2025-06-11T13:45:00.487401
  */
 
 const puppeteer = require('puppeteer');
@@ -22,7 +22,7 @@ describe('_tests', () => {
 
   beforeEach(async () => {
     page = await browser.newPage();
-    await page.goto('https://defi.space');
+    await page.goto('https://httpbin.org/html');
   });
 
   afterEach(async () => {
@@ -46,7 +46,7 @@ describe('_tests', () => {
     // Priority: medium
     
     // Navigate to home page
-    await page.goto('https://defi.space');
+    await page.goto('https://httpbin.org/html');
 
   }, 30000);
 

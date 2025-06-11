@@ -1,0 +1,38 @@
+# Simple Example: Basic webapp QA AI integration
+# File: .github/workflows/qa-testing.yml in ANY webapp repository
+
+name: Automated QA Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  qa-testing:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    # Build and deploy your app (customize this section)
+    - name: Setup and Build App
+      run: |
+        # Replace with your build commands
+        npm install
+        npm run build
+        npm run start:staging &
+        sleep 10  # Wait for app to start
+        
+    # Run QA AI on your deployed app
+    - name: Run QA AI Analysis
+      uses: floor-licker/qa-ai@v1
+      with:
+        app_url: 'http://localhost:3000'  # Your app URL
+        max_depth: 3
+        openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+        
+    # The generated tests are automatically uploaded as artifacts
+    # and reports are posted to PRs automatically! 

@@ -4,8 +4,8 @@ import { test, expect, Page } from '@playwright/test';
  * Test suite for  functionality
  * 
  * Generated from QA-AI exploration session
- * Base URL: https://defi.space
- * Generated: 2025-06-11T11:49:49.527772
+ * Base URL: https://httpbin.org/html
+ * Generated: 2025-06-11T13:45:00.486747
  */
 
 test.describe('_tests', () => {
@@ -13,7 +13,7 @@ test.describe('_tests', () => {
 
   test.beforeEach(async ({ page: testPage }) => {
     page = testPage;
-    await page.goto('https://defi.space');
+    await page.goto('https://httpbin.org/html');
 
   
   test('test_network_error_handling', async () => {
@@ -33,7 +33,7 @@ test.describe('_tests', () => {
     // Priority: medium
     
     // Navigate to home page
-    await page.goto('https://defi.space', { timeout: 10000 });
+    await page.goto('https://httpbin.org/html', { timeout: 10000 });
     // Performance assertion: Page should load in under 3 seconds
 
   });
