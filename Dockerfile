@@ -72,7 +72,14 @@ if [ "$HEADLESS" = "true" ]; then\n\
   CMD_ARGS="$CMD_ARGS --headless"\n\
 fi\n\
 \n\
-CMD_ARGS="$CMD_ARGS --frameworks $FRAMEWORKS --output-dir /github/workspace/$OUTPUT_DIR"\n\
+# Parse frameworks (comma-separated to individual args)\n\
+IFS="," read -ra FRAMEWORK_ARRAY <<< "$FRAMEWORKS"\n\
+FRAMEWORK_ARGS=""\n\
+for framework in "${FRAMEWORK_ARRAY[@]}"; do\n\
+  FRAMEWORK_ARGS="$FRAMEWORK_ARGS --frameworks $framework"\n\
+done\n\
+\n\
+CMD_ARGS="$CMD_ARGS $FRAMEWORK_ARGS --output-dir /github/workspace/$OUTPUT_DIR"\n\
 \n\
 # Run QA AI\n\
 echo "🚀 Executing: python main.py $CMD_ARGS"\n\

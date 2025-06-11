@@ -1,0 +1,18 @@
+name: QA AI Test
+
+on: 
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  qa-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Test with QA AI
+        uses: floor-licker/qa-ai@v1.0.0
+        with:
+          app_url: 'https://floor-licker.github.io/demo-web-app/'
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }} 
