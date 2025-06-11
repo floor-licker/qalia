@@ -54,7 +54,7 @@ outputs:
 
 runs:
   using: 'docker'
-  image: 'Dockerfile'
+  image: 'docker://ghcr.io/floor-licker/qa-ai:latest'
   env:
     OPENAI_API_KEY: ${{ inputs.openai_api_key }}
   args:
