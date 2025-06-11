@@ -1,6 +1,6 @@
 # 🤖 QALIA - Autonomous UI Testing, starts with QA et ça finit avec l’IA.
 
-**Stop writing tests manually. Let AI explore your entire application and generate comprehensive test suites automatically.**
+**Stop doing QA manually. Let AI explore your entire application and generate a comprehensive fingerprint state-map of user flows with corresponding test suites automatically, fully equipped to support automatic testcase generation with puppetteer, jest, and cypress.**
 
 Qalia is a GitHub Action that autonomously explores your web application using AI, discovers user journeys, identifies bugs, and generates production-ready test suites in Playwright, Cypress, and Jest—all integrated seamlessly into your CI/CD pipeline.
 
