@@ -102,7 +102,7 @@ class CleanWebExplorer:
             timeout=self.config.action_timeout
         ))
         
-        self.element_extractor = ElementExtractor(base_url)
+        self.element_extractor = ElementExtractor(base_url) if ElementExtractor is not None else None
         self.action_executor = None  # Will be initialized after browser setup
         self.state_manager = StateManager(base_url)
         self.error_handler = ErrorHandler()
