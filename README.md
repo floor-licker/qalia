@@ -7,18 +7,17 @@ Qalia is a GitHub Action that autonomously explores your web application using A
 ## 🎯 **The Problem We Solve**
 
 **Manual testing is expensive and incomplete:**
-- ❌ Writing comprehensive tests takes 2-3x longer than development
 - ❌ Manual exploratory testing misses edge cases and state combinations  
 - ❌ Test maintenance becomes a bottleneck as applications grow
-- ❌ Critical user journeys go untested until production failures occur
+- ❌ Certain user journeys go untested until production failures occur
 
 **Qalia's AI-powered solution:**
-- ✅ **60x faster exploration** than manual testing with state-based navigation
-- ✅ **Autonomous bug detection** catches issues before they reach production
+- ✅ **EXhaustive UI Exploration in Minutes**, dramatically faster and more reliable than manual testing with state-based navigation
+- ✅ **Autonomous bug detection** catches UI bugs before they reach users 
 - ✅ **Production-ready test generation** in multiple frameworks simultaneously
 - ✅ **Zero maintenance overhead** - tests evolve with your application
 
-## 💰 **Quantified Value Proposition**
+## 💰 **Quantified Improvement**
 
 | Traditional Approach | With Qalia | **Savings** |
 |---------------------|------------|-------------|
