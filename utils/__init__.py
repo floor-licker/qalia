@@ -60,6 +60,12 @@ except ImportError as e:
     NavigationUtils = None
     print(f"Warning: NavigationUtils not available: {e}")
 
+try:
+    from .typo_detector import TypoDetector
+except ImportError as e:
+    TypoDetector = None
+    print(f"Warning: TypoDetector not available: {e}")
+
 # Only include available components in __all__
 __all__ = []
 if BrowserManager is not None:
@@ -77,4 +83,6 @@ if ModalHandler is not None:
 if SessionReporter is not None:
     __all__.append('SessionReporter')
 if NavigationUtils is not None:
-    __all__.append('NavigationUtils') 
+    __all__.append('NavigationUtils')
+if TypoDetector is not None:
+    __all__.append('TypoDetector') 

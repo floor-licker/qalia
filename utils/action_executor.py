@@ -8,10 +8,14 @@ comprehensive error handling, retry logic, and adaptive timeouts.
 import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List
 from dataclasses import dataclass
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from .browser_manager import BrowserManager
+from .modal_handler import ModalHandler
+from .error_handler import ErrorHandler
+from .rich_state_detector import RichStateDetector, StateChange  # Import our new detector
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +28,24 @@ class ActionConfig:
     wait_after_action: float = 1.0
     modal_timeout: int = 2000
     form_timeout: int = 10000
+    enable_screenshots: bool = True
 
 
 @dataclass
 class ActionResult:
     """Result of an action execution."""
     success: bool
-    action: Dict[str, Any]
-    element: Dict[str, Any]
-    timestamp: float
+    action_type: str
+    element_info: Dict[str, Any]
     duration: float
-    error: Optional[str] = None
-    retry_count: int = 0
-    screenshots: list = None
+    error_message: Optional[str] = None
+    screenshot_path: Optional[str] = None
     
-    def __post_init__(self):
-        if self.screenshots is None:
-            self.screenshots = []
+    # Rich state detection results
+    state_changes: List[StateChange] = None
+    success_assessment: Dict[str, Any] = None
+    baseline_state: Dict[str, Any] = None
+    final_state: Dict[str, Any] = None
 
 
 class ActionExecutor:
@@ -51,9 +56,15 @@ class ActionExecutor:
     with adaptive timeouts and comprehensive error recovery.
     """
     
-    def __init__(self, page, config: Optional[ActionConfig] = None):
-        self.page = page
+    def __init__(self, browser_manager: BrowserManager, modal_handler: ModalHandler, 
+                 error_handler: ErrorHandler, config: ActionConfig = None):
+        self.browser_manager = browser_manager
+        self.modal_handler = modal_handler
+        self.error_handler = error_handler
         self.config = config or ActionConfig()
+        
+        # Initialize rich state detector
+        self.state_detector: Optional[RichStateDetector] = None
         
         # Test value generators
         self.test_values = {
@@ -68,188 +79,200 @@ class ActionExecutor:
         
         # Action history for learning
         self.action_history: list = []
-        self.error_handler: Optional[Callable] = None
-        self.screenshot_handler: Optional[Callable] = None
     
-    def set_error_handler(self, handler: Callable) -> None:
-        """Set error handler for action failures."""
-        self.error_handler = handler
+    async def initialize_state_detection(self):
+        """Initialize the rich state detection system."""
+        if self.browser_manager.page:
+            self.state_detector = RichStateDetector(self.browser_manager.page)
+            await self.state_detector.capture_baseline()
+            logger.info("🔍 Rich state detection initialized")
     
-    def set_screenshot_handler(self, handler: Callable) -> None:
-        """Set screenshot handler for capturing action states."""
-        self.screenshot_handler = handler
-    
-    async def execute_action(self, element: Dict[str, Any], action_type: str = None, value: str = None) -> ActionResult:
+    async def execute_action(self, element: Dict[str, Any]) -> ActionResult:
         """
-        Execute action on element with comprehensive error handling.
+        Execute an action on an element with rich state change detection.
         
         Args:
-            element: Element dictionary with selector and metadata
-            action_type: Override action type (auto-detected if None)
-            value: Override value for input actions
+            element: Element information containing selector, type, text, etc.
             
         Returns:
-            ActionResult with execution details
+            ActionResult with comprehensive success assessment
         """
         start_time = time.time()
+        action_type = self._determine_action_type(element)
+        element_type = element.get('type', 'unknown')
+        element_text = element.get('text', '')
+        selector = element.get('selector', '')
         
-        # Determine action type
-        if action_type is None:
-            action_type = self._determine_action_type(element)
+        logger.info(f"🎯 Executing {action_type} on {element_type}: {element_text[:50]}")
+                
+        # Ensure state detector is initialized
+        if not self.state_detector:
+            await self.initialize_state_detection()
         
-        # Create action object
-        action = {
-            'action': action_type,
-            'target': element['selector'],
-            'value': value or self._get_test_value(element),
-            'element_type': element['type']
-        }
-        
-        result = ActionResult(
-            success=False,
-            action=action,
-            element=element,
-            timestamp=start_time,
-            duration=0
-        )
-        
-        # Execute with retries
-        for attempt in range(self.config.retry_attempts + 1):
-            try:
-                result.retry_count = attempt
+        try:
+            # Capture baseline state before action
+            baseline_snapshot = await self.state_detector.capture_baseline()
                 
-                logger.info(f"🎯 Executing {action_type} on {element['type']}: {element.get('text', element.get('name', 'unnamed'))[:50]}")
+            # Execute the actual action
+            success, error_message, screenshot_path = await self._execute_playwright_action(
+                element, action_type
+            )
                 
-                # Capture before state if screenshot handler available
-                if self.screenshot_handler and attempt == 0:
-                    screenshot = await self.screenshot_handler("before_action", action)
-                    if screenshot:
-                        result.screenshots.append(screenshot)
+            # Wait for state changes to settle
+            await asyncio.sleep(self.config.wait_after_action)
                 
-                # Execute the specific action
-                await self._execute_specific_action(action, element)
+            # Detect and analyze state changes
+            action_description = f"{action_type} on {element_type} '{element_text}'"
+            state_changes = await self.state_detector.detect_changes_after_action(action_description)
                 
-                # Wait after action
-                await asyncio.sleep(self.config.wait_after_action)
+            # Get rich success assessment
+            success_assessment = self.state_detector.get_action_success_assessment(
+                state_changes, element_type, action_type
+            )
+            
+            # Override simple success with rich assessment if we have high confidence
+            if success_assessment["confidence"] > 0.8:
+                success = success_assessment["success"]
+                if not success and not error_message:
+                    error_message = success_assessment["reasoning"]
+            
+            duration = time.time() - start_time
+            
+            # Log rich assessment results
+            if state_changes:
+                logger.info(f"✅ Rich analysis: {len(state_changes)} changes detected, "
+                          f"success={success_assessment['success']} "
+                          f"(confidence: {success_assessment['confidence']:.1%})")
                 
-                # Action succeeded
-                result.success = True
-                result.duration = time.time() - start_time
-                
-                logger.info(f"✅ Action completed successfully: {action_type}")
-                
-                # Record successful action
-                self._record_action_result(action, element, True, None)
-                
-                return result
-                
-            except PlaywrightTimeoutError as e:
-                error_msg = f"Timeout: {str(e)}"
-                logger.warning(f"⏰ Action timeout (attempt {attempt + 1}): {error_msg}")
-                
-                # Handle timeout-specific retry logic
-                if attempt < self.config.retry_attempts:
-                    await self._handle_timeout_retry(action, element, attempt)
-                else:
-                    result.error = error_msg
+                for change in state_changes[:3]:  # Log first 3 changes
+                    logger.debug(f"   🔄 {change.change_type}: {change.description}")
+            else:
+                logger.warning(f"⚠️ No state changes detected for {action_description}")
+            
+            return ActionResult(
+                success=success,
+                action_type=action_type,
+                element_info=element,
+                duration=duration,
+                error_message=error_message,
+                screenshot_path=screenshot_path,
+                state_changes=state_changes,
+                success_assessment=success_assessment,
+                baseline_state=baseline_snapshot.__dict__ if baseline_snapshot else None,
+                final_state=self.state_detector.last_snapshot.__dict__ if self.state_detector.last_snapshot else None
+            )
                     
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"❌ Action failed (attempt {attempt + 1}): {error_msg}")
-                
-                # Handle general error retry logic
-                if attempt < self.config.retry_attempts:
-                    retry_success = await self._handle_error_retry(action, element, e, attempt)
-                    if not retry_success:
-                        result.error = error_msg
-                        break
-                else:
-                    result.error = error_msg
+        except Exception as e:
+            duration = time.time() - start_time
+            error_msg = f"Action execution failed: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            
+            return ActionResult(
+                success=False,
+                action_type=action_type,
+                element_info=element,
+                duration=duration,
+                error_message=error_msg,
+                state_changes=[],
+                success_assessment={
+                    "success": False,
+                    "confidence": 1.0,
+                    "reasoning": "Action execution threw exception",
+                    "severity": "critical",
+                    "evidence": str(e)
+                }
+            )
+
+    async def _execute_playwright_action(self, element: Dict[str, Any], action_type: str) -> tuple[bool, Optional[str], Optional[str]]:
+        """
+        Execute the actual Playwright action.
         
-        # Action failed after all retries
-        result.duration = time.time() - start_time
+        Returns:
+            Tuple of (success, error_message, screenshot_path)
+        """
+        try:
+            selector = element.get('selector', '')
+            page = self.browser_manager.page
+            
+            # Wait for element to be available
+            await page.wait_for_selector(selector, timeout=self.config.default_timeout)
+            
+            # Get the element
+            element_handle = page.locator(selector).first
         
-        # Capture failure screenshot
-        if self.screenshot_handler:
-            screenshot = await self.screenshot_handler("action_failed", action, result.error)
-            if screenshot:
-                result.screenshots.append(screenshot)
-        
-        # Record failed action
-        self._record_action_result(action, element, False, result.error)
-        
-        # Call error handler if available
-        if self.error_handler:
-            await self.error_handler(action, element, result.error)
-        
-        return result
+            # Scroll element into view
+            await element_handle.scroll_into_view_if_needed()
+            
+            # Wait for element to be actionable
+            await element_handle.wait_for(state="visible", timeout=self.config.default_timeout)
+            
+            # Execute action based on type
+            if action_type == "click":
+                await element_handle.click(timeout=self.config.default_timeout)
+            elif action_type == "hover":
+                await element_handle.hover(timeout=self.config.default_timeout)
+            elif action_type == "fill":
+                text_to_fill = element.get('value', 'test input')
+                await element_handle.fill(text_to_fill, timeout=self.config.default_timeout)
+            elif action_type == "select":
+                option_value = element.get('value', '0')
+                await element_handle.select_option(option_value, timeout=self.config.default_timeout)
+            else:
+                # Default to click
+                await element_handle.click(timeout=self.config.default_timeout)
+            
+            return True, None, None
+            
+        except Exception as e:
+            error_message = f"Playwright action failed: {str(e)}"
+            logger.error(f"❌ {error_message}")
+            
+            # Take error screenshot if enabled
+            screenshot_path = None
+            if self.config.enable_screenshots:
+                try:
+                    screenshot_path = await self._take_error_screenshot(element, str(e))
+                except Exception as screenshot_error:
+                    logger.error(f"❌ Failed to take error screenshot: {screenshot_error}")
+            
+            return False, error_message, screenshot_path
     
-    async def _execute_specific_action(self, action: Dict[str, Any], element: Dict[str, Any]) -> None:
-        """Execute the specific action based on action type."""
-        action_type = action['action']
-        selector = action['target']
-        value = action.get('value', '')
-        
-        # Get appropriate timeout
-        timeout = self._get_adaptive_timeout(action_type, element)
-        
-        # Wait for element
-        await self.page.wait_for_selector(selector, timeout=timeout)
-        locator = self.page.locator(selector).first
-        
-        # Execute based on action type
-        if action_type == 'click':
-            await locator.click(timeout=timeout)
+    async def _take_error_screenshot(self, element: Dict[str, Any], error: str) -> Optional[str]:
+        """Take a screenshot when an action fails."""
+        try:
+            timestamp = int(time.time())
+            element_text = element.get('text', 'unknown')[:20]
+            filename = f"error_{timestamp}_{element_text}.png"
             
-        elif action_type == 'fill':
-            await locator.fill(value, timeout=timeout)
+            # TODO: Integrate with session manager for proper path
+            screenshot_path = f"screenshots/{filename}"
+            await self.browser_manager.page.screenshot(path=screenshot_path)
             
-        elif action_type == 'type':
-            await locator.fill('')  # Clear first
-            await locator.type(value, timeout=timeout)
-            
-        elif action_type == 'select':
-            await locator.select_option(value, timeout=timeout)
-            
-        elif action_type == 'hover':
-            await locator.hover(timeout=timeout)
-            
-        elif action_type == 'focus':
-            await locator.focus(timeout=timeout)
-            
-        elif action_type == 'check':
-            await locator.check(timeout=timeout)
-            
-        elif action_type == 'uncheck':
-            await locator.uncheck(timeout=timeout)
-            
-        else:
-            raise ValueError(f"Unknown action type: {action_type}")
+            logger.info(f"📸 Error screenshot saved: {screenshot_path}")
+            return screenshot_path
+        except Exception as e:
+            logger.error(f"❌ Failed to save error screenshot: {e}")
+            return None
     
     def _determine_action_type(self, element: Dict[str, Any]) -> str:
-        """Determine appropriate action type for element."""
-        element_type = element['type']
+        """Determine the appropriate action type for an element."""
+        element_type = element.get('type', '').lower()
+        tag_name = element.get('tag', '').lower()
         
-        if element_type == 'button':
-            return 'click'
-        elif element_type == 'link':
-            return 'click'
-        elif element_type == 'input':
-            input_type = element.get('input_type', 'text')
-            if input_type in ['text', 'email', 'password', 'search', 'tel', 'url', 'number']:
-                return 'fill'
-            elif input_type == 'checkbox':
-                return 'check'
-            elif input_type == 'radio':
-                return 'check'
-            else:
-                return 'click'
+        if element_type in ['button', 'submit']:
+            return "click"
+        elif element_type in ['text', 'email', 'password', 'search']:
+            return "fill"
         elif element_type == 'select':
-            return 'select'
-        elif element_type == 'textarea':
-            return 'fill'
+            return "select"
+        elif tag_name in ['a', 'button']:
+            return "click"
+        elif tag_name in ['input', 'textarea']:
+            return "fill"
+        elif tag_name == 'select':
+            return "select"
         else:
-            return 'click'  # Default fallback
+            return "click"  # Default action
     
     def _get_test_value(self, element: Dict[str, Any]) -> str:
         """Get appropriate test value for element."""
@@ -364,7 +387,7 @@ class ActionExecutor:
         
         # Try scrolling element into view
         try:
-            locator = self.page.locator(action['target']).first
+            locator = self.browser_manager.page.locator(action['target']).first
             await locator.scroll_into_view_if_needed()
             await asyncio.sleep(1)
             return True
@@ -385,7 +408,7 @@ class ActionExecutor:
         
         for selector in modal_selectors:
             try:
-                modal = self.page.locator(selector).first
+                modal = self.browser_manager.page.locator(selector).first
                 if await modal.is_visible():
                     return True
             except:
@@ -397,7 +420,7 @@ class ActionExecutor:
         """Attempt to dismiss blocking modals."""
         try:
             # Try ESC key
-            await self.page.keyboard.press('Escape')
+            await self.browser_manager.page.keyboard.press('Escape')
             await asyncio.sleep(0.5)
             
             # Check if modal is gone
@@ -415,7 +438,7 @@ class ActionExecutor:
             
             for selector in close_selectors:
                 try:
-                    close_btn = self.page.locator(selector).first
+                    close_btn = self.browser_manager.page.locator(selector).first
                     if await close_btn.is_visible():
                         await close_btn.click(timeout=2000)
                         await asyncio.sleep(0.5)
@@ -496,4 +519,16 @@ class ActionExecutor:
             'total_actions': total,
             'success_rate': successes / total,
             'action_breakdown': action_stats
+        }
+    
+    def get_state_detector_summary(self) -> Dict[str, Any]:
+        """Get a summary of the state detector's findings."""
+        if not self.state_detector:
+            return {"initialized": False}
+        
+        return {
+            "initialized": True,
+            "total_changes_detected": len(self.state_detector.change_history),
+            "change_types": list(set(change.change_type for change in self.state_detector.change_history)),
+            "detector_state": self.state_detector.to_dict()
         } 

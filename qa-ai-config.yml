@@ -1,0 +1,101 @@
+# QA AI Configuration File
+# Defines how to deploy and test your application
+
+deployment:
+  # Choose deployment method: docker, localhost, cloud
+  method: "docker"
+  
+  # Application configuration
+  app:
+    port: 3000
+    build_command: "npm run build"
+    start_command: "npm start"
+    health_check_endpoint: "/health"
+    startup_timeout: 60
+    
+  # Docker configuration (if method: docker)
+  docker:
+    dockerfile: "./Dockerfile"
+    image_name: "qa-test-app"
+    container_name: "qa-test-container"
+    
+  # Cloud configuration (if method: cloud)
+  cloud:
+    provider: "vercel"  # vercel, netlify, aws
+    staging_url: ""      # Will be set dynamically
+    
+  # Localhost configuration (if method: localhost)
+  localhost:
+    base_url: "http://localhost:3000"
+
+# QA AI Exploration Settings
+exploration:
+  headless: true
+  max_depth: 5
+  timeout: 600
+  action_timeout: 5000
+  
+  # URLs to explore (relative to base_url)
+  entry_points:
+    - "/"
+    - "/login"
+    - "/profile"
+    - "/dashboard"
+
+# Test Generation Settings
+test_generation:
+  frameworks:
+    - "playwright"
+    - "cypress" 
+    - "jest"
+  
+  output_directory: "generated_tests"
+  
+  # Test execution settings
+  execution:
+    parallel: true
+    retry_count: 2
+    browsers:
+      playwright: ["chromium", "firefox"]
+      cypress: ["chrome"]
+
+# CI/CD Integration
+ci_cd:
+  # Fail pipeline if critical tests fail
+  fail_on_critical_failure: true
+  
+  # Upload artifacts
+  upload_reports: true
+  upload_videos: true
+  upload_screenshots: true
+  
+  # PR Comments
+  comment_on_pr: true
+  
+  # Notification settings
+  notifications:
+    slack_webhook: ""
+    email: ""
+
+# OpenAI Configuration
+openai:
+  model: "gpt-4"
+  max_tokens: 4000
+  
+# Security & Performance
+security:
+  # Mask sensitive data in reports
+  mask_sensitive_data: true
+  sensitive_patterns:
+    - "password"
+    - "token"
+    - "key"
+    - "secret"
+
+performance:
+  # Maximum execution time for entire pipeline
+  max_pipeline_duration: 1800  # 30 minutes
+  
+  # Resource limits
+  max_memory_mb: 4096
+  max_cpu_cores: 2 

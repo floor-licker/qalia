@@ -1,0 +1,4 @@
+#Ultimately when this program is deployed in github actions it will require certain inputs 
+#1. Entrypoint to the program, or a URL
+#2. Potentially which modes to run
+#3. If any authorization is required, demo credentals or other dummy data necessary for comprehensive UI fingerprinting

@@ -371,7 +371,7 @@ class ModalHandler:
                     return True
             except:
                 continue
-        return False
+        return False 
     
     def get_modal_interaction_summary(self) -> Dict[str, Any]:
         """Get summary of all modal interactions performed."""

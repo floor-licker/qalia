@@ -22,6 +22,7 @@ from utils import (
     SessionReporter,
     NavigationUtils
 )
+from utils.typo_detector import TypoDetector
 from core import SessionManager
 
 # Configure logging
@@ -112,6 +113,9 @@ class CleanWebExplorer:
         # Initialize reporter
         domain = self.navigation_utils.get_domain(base_url)
         self.reporter = SessionReporter(base_url, domain)
+        
+        # Initialize typo detector (will be configured with session dir during setup)
+        self.typo_detector = None
         
         # Exploration state
         self.visited_urls = set()
@@ -274,6 +278,9 @@ class CleanWebExplorer:
             self.error_handler.handle_http_error
         )
         
+        # Initialize typo detector with session directory
+        self.typo_detector = TypoDetector(session_dir=self.session_manager.session_dir)
+        
         logger.info("✅ All components setup completed")
     
     async def _systematic_exploration(self) -> None:
@@ -319,6 +326,23 @@ class CleanWebExplorer:
                 self.browser_manager.page
             )
             self.discovered_elements.extend(elements)
+            
+            # Perform typo detection on current page
+            logger.info(f"🔤 Analyzing page text for word candidates...")
+            try:
+                page_text_data = await self.typo_detector.extract_page_text(
+                    self.browser_manager.page
+                )
+                typo_report = self.typo_detector.analyze_text_for_typos(page_text_data)
+                
+                if typo_report.candidate_words_found > 0:
+                    logger.info(f"   📝 Found {typo_report.candidate_words_found} word candidates on {current_url}")
+                    logger.info(f"   📊 Total unique candidates: {len(self.typo_detector.word_candidates)}")
+                else:
+                    logger.info(f"   ✅ No unknown words found on {current_url}")
+                    
+            except Exception as e:
+                logger.warning(f"   ❌ Word analysis failed: {e}")
             
             if not elements:
                 logger.info(f"   📋 No interactive elements found on {current_url}")
@@ -427,6 +451,26 @@ class CleanWebExplorer:
         successful_actions = sum(1 for a in self.executed_actions if a.success)
         success_rate = successful_actions / total_actions if total_actions > 0 else 0
         
+        # Get typo detection summary and perform LLM analysis if candidates found
+        typo_summary = self.typo_detector.get_session_summary() if self.typo_detector else {}
+        
+        # Trigger LLM analysis for final results if we have candidates
+        if self.typo_detector and typo_summary.get('ready_for_llm_analysis', False):
+            logger.info(f"🤖 Running LLM analysis on {typo_summary.get('total_candidates', 0)} word candidates...")
+            try:
+                llm_analysis = await self.typo_detector.analyze_with_llm()
+                if llm_analysis:
+                    logger.info(f"✅ LLM analysis complete - {len(llm_analysis.confirmed_typos)} confirmed typos found")
+                    typo_summary['llm_analysis_completed'] = True
+                    typo_summary['confirmed_typos'] = len(llm_analysis.confirmed_typos)
+                    typo_summary['intentional_words'] = len(llm_analysis.intentional_words)
+                else:
+                    logger.info("⚠️ LLM analysis skipped (no API key or error)")
+                    typo_summary['llm_analysis_completed'] = False
+            except Exception as e:
+                logger.warning(f"❌ LLM analysis failed: {e}")
+                typo_summary['llm_analysis_completed'] = False
+        
         results = {
             'status': 'completed',
             'base_url': self.base_url,
@@ -441,7 +485,10 @@ class CleanWebExplorer:
                 'success_rate': success_rate,
                 'pages_visited': len(self.visited_urls) + 1,  # +1 for base page
                 'errors_found': error_summary['total_errors'],
-                'states_discovered': state_summary['total_states_discovered']
+                'states_discovered': state_summary['total_states_discovered'],
+                'word_candidates_found': typo_summary.get('total_candidates', 0),
+                'confirmed_typos': typo_summary.get('confirmed_typos', 0),
+                'llm_analysis_completed': typo_summary.get('llm_analysis_completed', False)
             },
             'detailed_results': {
                 'discovered_elements': self.discovered_elements,
@@ -487,7 +534,10 @@ class CleanWebExplorer:
                 'rich_state_detection': self.action_executor.get_state_detector_summary() if hasattr(self.action_executor, 'get_state_detector_summary') else {'initialized': False},
                 
                 # Modal interaction summary
-                'modal_interactions': self.modal_handler.get_modal_interaction_summary() if hasattr(self.modal_handler, 'get_modal_interaction_summary') else {'initialized': False}
+                'modal_interactions': self.modal_handler.get_modal_interaction_summary() if hasattr(self.modal_handler, 'get_modal_interaction_summary') else {'initialized': False},
+                
+                # Typo detection summary
+                'typo_analysis': typo_summary
             }
         }
         

@@ -1,0 +1,17 @@
+# act configuration file
+# Defines the runner environment for local GitHub Actions testing
+
+# Use larger runner with more resources for QA AI pipeline
+-P ubuntu-latest=catthehacker/ubuntu:act-20.04
+
+# Environment variables
+--env GITHUB_TOKEN=dummy_token_for_local_testing
+
+# Native architecture for M1 Macs
+--container-architecture linux/arm64
+
+# Increase container resources for QA AI pipeline
+--container-daemon-socket /Users/juliustranquilli/.colima/default/docker.sock
+
+# Verbose output for debugging
+--verbose 

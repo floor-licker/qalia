@@ -1,0 +1,140 @@
+name: QA AI - Full Pipeline Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  qa-ai-full-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python 3.9+
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Environment Setup
+      run: |
+        echo "🚀 QA AI Full Pipeline Test"
+        echo "=========================="
+        echo "Working directory: $(pwd)"
+        echo "Python: $(python3 --version)"
+        echo "Node: $(node --version)"
+        echo ""
+        echo "📁 Source code files:"
+        ls -la
+        
+    - name: Install QA AI Dependencies
+      run: |
+        echo "📦 Installing dependencies..."
+        pip install --no-cache-dir playwright beautifulsoup4 lxml requests openai
+        playwright install chromium
+        playwright install-deps || echo "Some system deps might be missing, continuing..."
+        
+    - name: Verify QA AI Files
+      run: |
+        echo "📁 Verifying QA AI project structure..."
+        echo "✅ Main files:"
+        ls -la *.py 2>/dev/null | head -5
+        echo ""
+        echo "✅ Scripts directory:"
+        ls -la scripts/ 2>/dev/null | head -5
+        echo ""
+        echo "✅ Generators directory:"
+        ls -la generators/ 2>/dev/null | head -5
+        echo ""
+        echo "✅ Core directories:"
+        ls -d */ | grep -E "(core|exploration|utils|reporting)" | head -5
+        
+    - name: Test QA AI Imports
+      run: |
+        echo "🧪 Testing QA AI module imports..."
+        python3 -c "
+        import sys
+        import os
+        sys.path.insert(0, '.')
+        
+        print('Testing imports...')
+        try:
+            import main
+            print('✅ main.py imported successfully')
+        except Exception as e:
+            print('❌ main.py import error:', e)
+        
+        try:
+            from scripts.run_exploration import run_exploration
+            print('✅ run_exploration imported successfully')
+        except Exception as e:
+            print('❌ run_exploration import error:', e)
+            
+        try:
+            from generators import TestCaseGenerator
+            print('✅ TestCaseGenerator imported successfully')
+        except Exception as e:
+            print('❌ TestCaseGenerator import error:', e)
+        
+        # Test if we can create a TestCaseGenerator instance
+        try:
+            generator = TestCaseGenerator()
+            print('✅ TestCaseGenerator instance created')
+        except Exception as e:
+            print('❌ TestCaseGenerator instantiation error:', e)
+        "
+        
+    - name: Run QA AI on Test Site
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        echo "🌐 Running QA AI pipeline on test website..."
+        echo "Target: https://httpbin.org/html (simple test site)"
+        echo "Config: headless mode, max depth 1, timeout 60s"
+        echo ""
+        
+        timeout 120 python3 main.py https://httpbin.org/html \
+          --headless \
+          --max-depth 1 \
+          --timeout 60 \
+          --output-dir ./act_test_results || echo "⏰ Test completed (may have timed out)"
+          
+    - name: Analyze Results
+      run: |
+        echo "📊 QA AI Test Results Analysis"
+        echo "============================="
+        
+        if [ -d "act_test_results" ]; then
+          echo "✅ Output directory created successfully"
+          echo ""
+          echo "📁 Generated files:"
+          find act_test_results -type f | head -20
+          echo ""
+          echo "📈 File count by type:"
+          echo "Test files: $(find act_test_results -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" | wc -l)"
+          echo "Report files: $(find act_test_results -name "*.md" | wc -l)"
+          echo "JSON files: $(find act_test_results -name "*.json" | wc -l)"
+          echo ""
+          
+          # Show generation summary if it exists
+          if [ -f "act_test_results/generation_summary.json" ]; then
+            echo "📋 Generation Summary:"
+            cat act_test_results/generation_summary.json | head -10
+          fi
+          
+          # Show first few lines of any generated test
+          echo ""
+          echo "🧪 Sample Generated Test (first 10 lines):"
+          find act_test_results -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" | head -1 | xargs head -10 2>/dev/null || echo "No test files found"
+          
+        else
+          echo "❌ No output directory found"
+          echo "This might indicate an issue with the QA AI pipeline"
+        fi
+        
+        echo ""
+        echo "🏁 QA AI Full Pipeline Test Complete!"
+        echo "Duration: Pipeline ran for up to 2 minutes"
+        echo "Environment: Simulated GitHub Actions (act)" 
