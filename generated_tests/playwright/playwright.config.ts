@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'https://defi.space',
+    baseURL: 'https://httpbin.org/html',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

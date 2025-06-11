@@ -1,6 +1,37 @@
-# QA-AI: Autonomous Website Testing and Exploration
+# 🤖 QA AI - Autonomous Website Testing
 
-**Modular AI-powered web application testing system using GPT-4 and Playwright for autonomous website exploration and bug detection.**
+**Add AI-powered testing to any webapp in 5 minutes**
+
+A GitHub Action that automatically explores your web application, generates comprehensive test suites using AI analysis, and integrates seamlessly into your CI/CD pipeline.
+
+## 🚀 For Webapp Developers
+
+**Stop writing tests manually. Let AI do it for you.**
+
+Add this to your `.github/workflows/qa-testing.yml`:
+```yaml
+- name: QA AI Testing
+  uses: floor-licker/qa-ai@v1
+  with:
+    app_url: 'https://your-app.com'
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+**That's it!** QA AI will explore your app and generate Playwright, Cypress, and Jest tests automatically.
+
+📖 **[Full Integration Guide →](INTEGRATION_GUIDE.md)**
+
+---
+
+## 🎯 What QA AI Does
+
+1. **🔍 Explores** your webapp autonomously using AI
+2. **🧠 Analyzes** user journeys and interaction patterns  
+3. **⚡ Generates** production-ready test suites
+4. **📊 Reports** issues directly to your PRs
+5. **🚨 Alerts** on accessibility, performance, and UX problems
+
+---
 
 ## SYSTEM ARCHITECTURE
 

@@ -1,0 +1,38 @@
+name: Test QA AI Action
+
+on:
+  workflow_dispatch:  # Manual trigger for testing
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'examples/**'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout QA AI
+      uses: actions/checkout@v4
+      
+    - name: Test QA AI Action
+      uses: ./  # Use current repository as action
+      with:
+        app_url: 'https://httpbin.org'
+        max_depth: 2
+        timeout: 120
+        frameworks: 'playwright'
+        openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+        run_tests: false  # Just generate tests, don't run them
+        
+    - name: Verify Generated Tests
+      run: |
+        echo "🔍 Checking generated tests..."
+        if [ -d "qa-ai-tests" ]; then
+          echo "✅ Tests directory created"
+          find qa-ai-tests -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" | head -5
+          echo "📊 Total test files: $(find qa-ai-tests -name "*.spec.ts" -o -name "*.cy.js" -o -name "*.test.js" | wc -l)"
+        else
+          echo "❌ No tests generated"
+          exit 1
+        fi 

@@ -2,13 +2,13 @@
  * Test suite for  functionality
  * 
  * Generated from QA-AI exploration session
- * Base URL: https://defi.space
- * Generated: 2025-06-11T11:49:49.528158
+ * Base URL: https://httpbin.org/html
+ * Generated: 2025-06-11T13:45:00.487245
  */
 
 describe('_tests', () => {
   beforeEach(() => {
-    cy.visit('https://defi.space');
+    cy.visit('https://httpbin.org/html');
   });
 
   
@@ -28,7 +28,7 @@ describe('_tests', () => {
     // Priority: medium
     
     // Navigate to home page
-    cy.visit('https://defi.space');
+    cy.visit('https://httpbin.org/html');
 
   });
 

@@ -1,0 +1,61 @@
+name: 'QA AI - Automated Testing'
+description: 'Autonomous web exploration and test case generation for your webapp'
+author: 'QA AI Team'
+
+branding:
+  icon: 'search'
+  color: 'blue'
+
+inputs:
+  app_url:
+    description: 'URL of the deployed application to test'
+    required: true
+  max_depth:
+    description: 'Maximum exploration depth'
+    required: false
+    default: '3'
+  timeout:
+    description: 'Timeout in seconds for exploration'
+    required: false
+    default: '300'
+  headless:
+    description: 'Run browser in headless mode'
+    required: false
+    default: 'true'
+  frameworks:
+    description: 'Test frameworks to generate (comma-separated: playwright,cypress,jest)'
+    required: false
+    default: 'playwright,cypress,jest'
+  output_dir:
+    description: 'Directory to save generated tests'
+    required: false
+    default: 'qa-ai-tests'
+  openai_api_key:
+    description: 'OpenAI API key for analysis'
+    required: true
+  run_tests:
+    description: 'Whether to run the generated tests'
+    required: false
+    default: 'true'
+  github_token:
+    description: 'GitHub token for creating issues/PRs'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  test_results:
+    description: 'Path to test results'
+  report_path:
+    description: 'Path to QA analysis report'
+  tests_generated:
+    description: 'Number of tests generated'
+  issues_found:
+    description: 'Number of issues found'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+  args:
+    - ${{ inputs.app_url }} 

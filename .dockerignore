@@ -1,0 +1,57 @@
+# Git files
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Generated files
+generated_tests/
+exploration_sessions/
+screenshots/
+site_maps/
+qa_ai_session.log
+
+# Development files
+.env
+.actrc
+copy-to-demo-repo.sh
+temp-demo-repo/
+
+# Demo web app (not needed in action)
+demo-web-app/
+
+# Examples and tests
+examples/
+tests/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~ 
