@@ -1,4 +1,4 @@
-# 🤖 QALIA - Autonomous UI Testing, starts with QA et ça finit avec l’IA.
+# 🤖 QALIA - Autonomous UI Testing, starts with QA et ça finit avec l'IA.
 
 **Stop doing QA manually. Let AI explore your entire application and generate a comprehensive fingerprint state-map of user flows with corresponding test suites automatically, fully equipped to support automatic testcase generation with puppetteer, jest, and cypress.**
 
@@ -234,3 +234,28 @@ webdriver.io  # Advanced automation scenarios
 </details>
 
 **Questions?** Open an issue or check our [Documentation](INTEGRATION_GUIDE.md)
+
+## 📁 **Repository Structure**
+
+```
+qalia/                          # Main QA AI tool repository
+├── 🔧 Source Code              # QA AI tool implementation
+├── 🐳 Docker Publishing        # Automated image builds
+├── ✅ Tool Validation          # Tests that QA AI works correctly
+└── 📚 Documentation           # How to use QA AI
+
+demo-web-app/                   # Demonstration website
+├── 🌐 Sample Web App           # TechStore e-commerce demo
+├── 🧪 QA AI Workflows          # Examples of using QA AI
+└── 📊 Live Results             # See QA AI in action
+```
+
+### **Important: Repository Roles**
+
+- **🔧 Main QA AI Repo**: Contains the **tool source code** - NOT tested by QA AI
+- **🌐 Demo Web App**: Sample **website** that **demonstrates** QA AI capabilities
+- **👥 User Repositories**: Real applications where QA AI provides value
+
+> **Note**: QA AI doesn't test itself! The `qalia` repository contains the tool's source code, while `demo-web-app` showcases how to use QA AI on actual web applications.
+
+## 🎯 **Quick Start**
