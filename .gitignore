@@ -94,4 +94,7 @@ dmypy.json
 .env.*
 .github/secrets.env
 secrets.env
-*.env 
+*.env
+
+# Secrets
+.github/secrets.env 
