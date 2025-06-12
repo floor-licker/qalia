@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: floor-licker/qalia
+  IMAGE_NAME: webisoftSoftware/qalia
 
 jobs:
   build-and-push:
@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # Needed for OIDC token
 
     steps:
     - name: Checkout repository
@@ -68,7 +69,7 @@ jobs:
         echo "🚀 **Usage in GitHub Actions:**" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`yaml" >> $GITHUB_STEP_SUMMARY
         echo "- name: Run QA AI" >> $GITHUB_STEP_SUMMARY
-        echo "  uses: floor-licker/qalia@v1" >> $GITHUB_STEP_SUMMARY
+        echo "  uses: webisoftSoftware/qalia@v1" >> $GITHUB_STEP_SUMMARY
         echo "  with:" >> $GITHUB_STEP_SUMMARY
         echo "    app_url: 'https://your-app.com'" >> $GITHUB_STEP_SUMMARY
         echo "    openai_api_key: \${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_STEP_SUMMARY
