@@ -70,7 +70,7 @@ jobs:
         🚀 **Usage in GitHub Actions:**
         \`\`\`yaml
         - name: Run QA AI
-          uses: webisoftSoftware/qalia@v1
+          uses: webisoftsoftware/qalia@main
           with:
             app_url: 'https://your-app.com'
             openai_api_key: \${{ secrets.OPENAI_API_KEY }}
