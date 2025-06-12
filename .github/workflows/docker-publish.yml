@@ -59,18 +59,20 @@ jobs:
 
     - name: Generate summary
       run: |
-        echo "🐳 **Docker Image Published Successfully!**" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📦 **Published Images:**" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "${{ steps.meta.outputs.tags }}" | sed 's/,/\n/g' >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🚀 **Usage in GitHub Actions:**" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`yaml" >> $GITHUB_STEP_SUMMARY
-        echo "- name: Run QA AI" >> $GITHUB_STEP_SUMMARY
-        echo "  uses: webisoftSoftware/qalia@v1" >> $GITHUB_STEP_SUMMARY
-        echo "  with:" >> $GITHUB_STEP_SUMMARY
-        echo "    app_url: 'https://your-app.com'" >> $GITHUB_STEP_SUMMARY
-        echo "    openai_api_key: \${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY 
+        {
+          echo "🐳 **Docker Image Published Successfully!**"
+          echo ""
+          echo "📦 **Published Images:**"
+          echo "\`\`\`"
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/,/\n/g'
+          echo "\`\`\`"
+          echo ""
+          echo "🚀 **Usage in GitHub Actions:**"
+          echo "\`\`\`yaml"
+          echo "- name: Run QA AI"
+          echo "  uses: webisoftSoftware/qalia@v1"
+          echo "  with:"
+          echo "    app_url: 'https://your-app.com'"
+          echo "    openai_api_key: \${{ secrets.OPENAI_API_KEY }}"
+          echo "\`\`\`"
+        } >> $GITHUB_STEP_SUMMARY 
