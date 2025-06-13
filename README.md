@@ -34,9 +34,37 @@ Qalia is a GitHub App that autonomously explores your web application using AI, 
 2. **Choose repositories** to install on (or select all repositories)
 3. **Grant permissions** for the app to access your repositories
 
-### **Step 2: Configure Deployment URLs**
+### **Step 2: Configure Your Application**
 
-Set environment variables in your Render dashboard or repository settings:
+Create a `qalia.yml` file in your repository root to tell Qalia how to deploy and test your application:
+
+```yaml
+# qalia.yml - Application configuration for Qalia
+deployment:
+  type: "npm"  # Options: static, npm, python, docker, custom
+  build:
+    - "npm install"
+    - "npm run build"
+  start:
+    command: "npm start"
+    port: 3000
+    wait_for_ready: 30
+    health_check: "http://localhost:3000"
+
+testing:
+  entry_points:
+    - url: "/"
+      name: "Homepage"
+    - url: "/login"
+      name: "Login Page"
+  exploration:
+    max_depth: 3
+    timeout: 300
+  generation:
+    frameworks: ["playwright", "cypress", "jest"]
+```
+
+**Alternative: Environment Variables** (for existing deployments)
 
 ```bash
 # For specific repositories

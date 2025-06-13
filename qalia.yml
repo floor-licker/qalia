@@ -1,4 +1,79 @@
-#Ultimately when this program is deployed in github actions it will require certain inputs 
-#1. Entrypoint to the program, or a URL
-#2. Potentially which modes to run
-#3. If any authorization is required, demo credentals or other dummy data necessary for comprehensive UI fingerprinting
+# Qalia Configuration for Demo Web App
+# This file tells Qalia how to deploy and test this simple HTML application
+
+# Application deployment configuration
+deployment:
+  # This is a static HTML site
+  type: "static"
+  
+  # No build commands needed for this simple HTML app
+  build: []
+  
+  # How to start the application
+  start:
+    command: "python -m http.server 8080"
+    port: 8080
+    wait_for_ready: 10  # seconds to wait for app to be ready
+    health_check: "http://localhost:8080"  # URL to check if app is ready
+
+# Testing configuration
+testing:
+  # Entry points for exploration
+  entry_points:
+    - url: "/"
+      name: "Homepage"
+      description: "Main landing page with navigation"
+    - url: "/about.html"
+      name: "About Page"
+      description: "About page with information"
+    - url: "/contact.html"
+      name: "Contact Page"
+      description: "Contact form page"
+  
+  # Exploration settings
+  exploration:
+    max_depth: 2  # Simple site, don't need deep exploration
+    timeout: 120  # Shorter timeout for simple site
+    headless: true
+    viewport:
+      width: 1920
+      height: 1080
+  
+  # Test generation settings
+  generation:
+    frameworks: ["playwright", "cypress"]  # Focus on these two frameworks
+    output_dir: "qalia-tests"
+    include_accessibility: true
+    include_performance: false  # Skip performance tests for demo
+
+# No authentication needed for this demo app
+authentication:
+  enabled: false
+
+# Simple test scenarios for the demo app
+scenarios:
+  - name: "Navigation Test"
+    description: "Test navigation between pages"
+    steps:
+      - action: "navigate"
+        url: "/"
+      - action: "click"
+        selector: "a[href='about.html']"
+      - action: "wait_for"
+        selector: "h1"
+      - action: "click"
+        selector: "a[href='contact.html']"
+      - action: "wait_for"
+        selector: "form"
+
+# Exclusions (nothing to exclude for this simple demo)
+exclusions:
+  urls: []
+  selectors: []
+
+# Notifications
+notifications:
+  github:
+    enabled: true
+    create_check_run: true
+    comment_on_pr: true

@@ -13,16 +13,20 @@ import tempfile
 import shutil
 from pathlib import Path
 import logging
+import subprocess
+import os
 
 # Import QA AI functionality from the current directory
 try:
     from main import run_complete_pipeline
     from scripts.run_exploration import run_exploration
     from generators import TestCaseGenerator
+    from qalia_config import get_application_url, QaliaConfig
 except ImportError as e:
     logging.error(f"Failed to import QA AI modules: {e}")
     # For development/testing, we'll handle this gracefully
     run_complete_pipeline = None
+    get_application_url = None
 
 # Import configuration
 from github_config import get_deployment_url, get_app_config, validate_config
@@ -104,34 +108,95 @@ def get_github_client(installation_id: int) -> Github:
     # Return client with installation token
     return Github(token.token)
 
-async def run_qalia_analysis(repo_url: str, branch: str = "main") -> Dict[str, Any]:
+async def clone_repository(repo_url: str, branch: str = "main") -> str:
+    """Clone repository to a temporary directory and return the path."""
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # Clone the repository
+        cmd = f"git clone --branch {branch} --depth 1 {repo_url} {temp_dir}"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"Failed to clone repository: {result.stderr}")
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return None
+        
+        logger.info(f"Repository cloned to {temp_dir}")
+        return temp_dir
+    except Exception as e:
+        logger.error(f"Error cloning repository: {e}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return None
+
+async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str = None) -> Dict[str, Any]:
     """Run QA AI analysis on a deployed application."""
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key not configured")
     
-    if not run_complete_pipeline:
+    if not run_complete_pipeline or not get_application_url:
         raise HTTPException(status_code=500, detail="QA AI modules not available")
     
-    # Use configuration module to determine deployment URL
-    app_url = get_deployment_url(repo_url, branch)
-    
     try:
+        # Determine application URL using qalia.yml or fallback to old method
+        if repo_path and get_application_url:
+            try:
+                app_url = await get_application_url(repo_path)
+                logger.info(f"Using qalia.yml configuration, app deployed at: {app_url}")
+            except Exception as e:
+                logger.warning(f"Failed to use qalia.yml deployment: {e}")
+                # Fallback to old method
+                app_url = get_deployment_url(repo_url, branch)
+                logger.info(f"Falling back to configured deployment URL: {app_url}")
+        else:
+            # Use old configuration method
+            app_url = get_deployment_url(repo_url, branch)
+            logger.info(f"Using configured deployment URL: {app_url}")
+        
+        # Load qalia.yml configuration if available
+        config = None
+        if repo_path:
+            try:
+                config_path = os.path.join(repo_path, "qalia.yml")
+                config = QaliaConfig(config_path)
+                logger.info("Loaded qalia.yml configuration")
+            except Exception as e:
+                logger.warning(f"Could not load qalia.yml: {e}")
+        
         # Create temporary directory for results
         with tempfile.TemporaryDirectory() as temp_dir:
             # Run QA AI analysis
             logger.info(f"Running QA AI analysis on {app_url}")
             
-            exploration_options = {
-                "headless": True,
-                "max_depth": 3,
-                "timeout": 300,
-                "output_dir": temp_dir
-            }
-            
-            generation_options = {
-                "frameworks": ["playwright", "cypress", "jest"],
-                "output_dir": temp_dir
-            }
+            # Use configuration from qalia.yml if available
+            if config:
+                testing_config = config.get_testing_config()
+                exploration_config = testing_config.get("exploration", {})
+                generation_config = testing_config.get("generation", {})
+                
+                exploration_options = {
+                    "headless": exploration_config.get("headless", True),
+                    "max_depth": exploration_config.get("max_depth", 3),
+                    "timeout": exploration_config.get("timeout", 300),
+                    "output_dir": temp_dir
+                }
+                
+                generation_options = {
+                    "frameworks": generation_config.get("frameworks", ["playwright", "cypress", "jest"]),
+                    "output_dir": temp_dir
+                }
+            else:
+                # Default options
+                exploration_options = {
+                    "headless": True,
+                    "max_depth": 3,
+                    "timeout": 300,
+                    "output_dir": temp_dir
+                }
+                
+                generation_options = {
+                    "frameworks": ["playwright", "cypress", "jest"],
+                    "output_dir": temp_dir
+                }
             
             results = await run_complete_pipeline(
                 app_url, 
@@ -148,7 +213,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main") -> Dict[str, A
                 "session_directory": results.get("session_directory"),
                 "total_test_cases": 0,
                 "issues_found": 0,
-                "recommendations": []
+                "recommendations": [],
+                "config_used": "qalia.yml" if config else "environment_variables"
             }
             
             # Extract key metrics
@@ -165,7 +231,7 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main") -> Dict[str, A
         return {
             "status": "failed",
             "error": str(e),
-            "app_url": app_url
+            "app_url": app_url if 'app_url' in locals() else "unknown"
         }
 
 async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_results: Dict[str, Any]):
@@ -326,8 +392,17 @@ async def handle_pull_request(payload: Dict[str, Any]):
     # Get GitHub client
     g = get_github_client(installation_id)
     
-    # Run QA AI analysis
-    analysis_results = await run_qalia_analysis(repo_name, branch)
+    # Clone repository to access qalia.yml
+    repo_url = payload["repository"]["clone_url"]
+    repo_path = await clone_repository(repo_url, branch)
+    
+    try:
+        # Run QA AI analysis
+        analysis_results = await run_qalia_analysis(repo_url, branch, repo_path)
+    finally:
+        # Clean up cloned repository
+        if repo_path:
+            shutil.rmtree(repo_path, ignore_errors=True)
     
     # Get app configuration
     config = get_app_config()
@@ -358,8 +433,17 @@ async def handle_push(payload: Dict[str, Any]):
     # Get GitHub client
     g = get_github_client(installation_id)
     
-    # Run QA AI analysis
-    analysis_results = await run_qalia_analysis(repo_name, branch)
+    # Clone repository to access qalia.yml
+    repo_url = payload["repository"]["clone_url"]
+    repo_path = await clone_repository(repo_url, branch)
+    
+    try:
+        # Run QA AI analysis
+        analysis_results = await run_qalia_analysis(repo_url, branch, repo_path)
+    finally:
+        # Clean up cloned repository
+        if repo_path:
+            shutil.rmtree(repo_path, ignore_errors=True)
     
     # Create check run
     await create_check_run(g, repo_name, commit_sha, analysis_results)
