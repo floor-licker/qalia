@@ -2,7 +2,7 @@
 
 **Stop doing QA manually. Let AI explore your entire application and generate a comprehensive fingerprint state-map of user flows with corresponding test suites automatically, fully equipped to support automatic testcase generation with puppetteer, jest, and cypress.**
 
-Qalia is a GitHub Action that autonomously explores your web application using AI, discovers user journeys, identifies bugs, and generates production-ready test suites in Playwright, Cypress, and Jest—all integrated seamlessly into your CI/CD pipeline.
+Qalia is a GitHub App that autonomously explores your web application using AI, discovers user journeys, identifies bugs, and generates production-ready test suites in Playwright, Cypress, and Jest—all integrated seamlessly into your development workflow through PR comments and check runs.
 
 ## 🎯 **The Problem We Solve**
 
@@ -26,55 +26,34 @@ Qalia is a GitHub Action that autonomously explores your web application using A
 | 3-5 days exploratory testing | 10 minutes automated exploration | **~95% faster coverage** |
 | Manual bug reproduction | Automatic screenshots + reproduction steps | **~90% faster debugging** |
 
-## 🚀 **Quick Implementation**
+## 🚀 **Quick Setup**
 
-### **Step 1: Add to Your GitHub Workflow**
+### **Step 1: Install the GitHub App**
 
-Create `.github/workflows/qalia-testing.yml`:
+1. **Visit the GitHub App page**: [Install Qalia](https://github.com/apps/qalia)
+2. **Choose repositories** to install on (or select all repositories)
+3. **Grant permissions** for the app to access your repositories
 
-```yaml
-name: Qalia AI Testing
+### **Step 2: Configure Deployment URLs**
 
-on:
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  ai-testing:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Autonomous AI Testing
-        uses: floor-licker/qalia@v1
-        with:
-          app_url: 'https://your-staging-app.com'
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          max_depth: 3
-          frameworks: 'playwright,cypress,jest'
-          output_dir: 'ai-generated-tests'
-      
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: qalia-test-results
-          path: ai-generated-tests/
-```
-
-### **Step 2: Configure Your Secrets**
+Set environment variables in your Render dashboard or repository settings:
 
 ```bash
-# Add your OpenAI API key to GitHub Secrets
-gh secret set OPENAI_API_KEY --body "your-openai-api-key"
+# For specific repositories
+DEPLOY_URL_MYORG_MYAPP=https://myapp.herokuapp.com
+
+# Or use a generic pattern
+DEFAULT_DEPLOY_URL=https://{repo}.herokuapp.com
 ```
 
-### **Step 3: Deploy and Analyze**
+### **Step 3: Automatic Analysis**
 
-Your next PR will automatically:
-- 🔍 **Explore** your entire application autonomously
-- 🧠 **Analyze** user flows with GPT-4
+Once installed, Qalia will automatically:
+- 🔍 **Analyze PRs** when opened or updated
+- 🧠 **Explore** your deployed application with AI
 - ⚡ **Generate** comprehensive test suites
-- 📊 **Report** bugs and performance issues
-- 🚨 **Comment** on PRs with actionable insights
+- 📊 **Create check runs** with detailed results
+- 🚨 **Comment on PRs** with actionable insights
 
 ## 🎯 **Advanced Configuration**
 

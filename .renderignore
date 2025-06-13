@@ -1,4 +1,0 @@
-*
-# This repository contains a CLI tool and GitHub Action
-# It should not be deployed as a web service on Render
-# If you want to deploy the GitHub app, use the qalia-github-app subdirectory 
