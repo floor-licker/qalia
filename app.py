@@ -78,7 +78,7 @@ def verify_webhook_signature(request_body: bytes, signature: str) -> bool:
     
     return hmac.compare_digest(f"sha256={expected_signature}", signature)
 
-def get_github_client(installation_id: int) -> Github:
+def get_github_client(installation_id: int) -> tuple[Github, str]:
     """Get an authenticated GitHub client for the installation."""
     if not GITHUB_APP_ID:
         raise HTTPException(status_code=500, detail="GitHub App ID not configured")
@@ -122,13 +122,18 @@ def get_github_client(installation_id: int) -> Github:
     token_data = response.json()
     access_token = token_data["token"]
     
-    # Return client with installation token
-    return Github(access_token)
+    # Return client with installation token and the token itself
+    return Github(access_token), access_token
 
-async def clone_repository(repo_url: str, branch: str = "main") -> str:
+async def clone_repository(repo_url: str, branch: str = "main", access_token: str = None) -> str:
     """Clone repository to a temporary directory and return the path."""
     temp_dir = tempfile.mkdtemp()
     try:
+        # Use token-authenticated URL if token is provided
+        if access_token and repo_url.startswith("https://github.com/"):
+            # Convert to authenticated URL
+            repo_url = repo_url.replace("https://github.com/", f"https://x-access-token:{access_token}@github.com/")
+        
         # Clone the repository
         cmd = f"git clone --branch {branch} --depth 1 {repo_url} {temp_dir}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -426,7 +431,7 @@ async def handle_pull_request(payload: Dict[str, Any]):
         
         # Get GitHub client
         try:
-            g = get_github_client(installation_id)
+            g, access_token = get_github_client(installation_id)
             logger.info("GitHub client created successfully")
         except Exception as e:
             logger.error(f"Failed to create GitHub client: {e}")
@@ -435,7 +440,7 @@ async def handle_pull_request(payload: Dict[str, Any]):
         # Clone repository to access qalia.yml
         repo_url = payload["repository"]["clone_url"]
         logger.info(f"Cloning repository: {repo_url}")
-        repo_path = await clone_repository(repo_url, branch)
+        repo_path = await clone_repository(repo_url, branch, access_token)
         
         if not repo_path:
             logger.error("Failed to clone repository")
@@ -505,11 +510,11 @@ async def handle_push(payload: Dict[str, Any]):
     logger.info(f"Processing push to {branch} in {repo_name}")
     
     # Get GitHub client
-    g = get_github_client(installation_id)
+    g, access_token = get_github_client(installation_id)
     
     # Clone repository to access qalia.yml
     repo_url = payload["repository"]["clone_url"]
-    repo_path = await clone_repository(repo_url, branch)
+    repo_path = await clone_repository(repo_url, branch, access_token)
     
     try:
         # Run QA AI analysis
