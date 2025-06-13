@@ -345,20 +345,31 @@ async def github_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
     
+    # Log all headers for debugging
+    logger.info(f"Webhook headers: {dict(request.headers)}")
+    
     # Verify webhook signature
     if not verify_webhook_signature(body, signature):
+        logger.error("Invalid webhook signature")
         raise HTTPException(status_code=403, detail="Invalid webhook signature")
     
     # Parse payload
     try:
         payload = json.loads(body.decode())
     except json.JSONDecodeError:
+        logger.error("Invalid JSON payload")
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
     
     # Get event type
     event_type = request.headers.get("X-GitHub-Event")
     
-    logger.info(f"Received {event_type} event")
+    logger.info(f"Received {event_type} event from repository: {payload.get('repository', {}).get('full_name', 'unknown')}")
+    
+    # Log payload action for debugging
+    if event_type == "pull_request":
+        action = payload.get("action", "unknown")
+        pr_number = payload.get("pull_request", {}).get("number", "unknown")
+        logger.info(f"Pull request action: {action}, PR number: {pr_number}")
     
     # Handle different event types
     if event_type == "pull_request":
