@@ -34,6 +34,31 @@ Qalia is a GitHub App that autonomously explores your web application using AI, 
 2. **Choose repositories** to install on (or select all repositories)
 3. **Grant permissions** for the app to access your repositories
 
+## 📋 **Demo Web App Configuration**
+
+This repository includes a `qalia.yml` configuration file that demonstrates how to set up Qalia for a simple HTML application:
+
+```yaml
+# This demo app uses static HTML deployment
+deployment:
+  type: "static"
+  start:
+    command: "python -m http.server 8080"
+    port: 8080
+
+# Test the main pages of the demo app
+testing:
+  entry_points:
+    - url: "/"
+      name: "Homepage"
+    - url: "/about.html"
+      name: "About Page"
+    - url: "/contact.html"
+      name: "Contact Page"
+```
+
+**🎯 Perfect for testing Qalia's capabilities on a real web application!**
+
 ### **Step 2: Configure Your Application**
 
 Create a `qalia.yml` file in your repository root to tell Qalia how to deploy and test your application:

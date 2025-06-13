@@ -262,9 +262,9 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
     
     if analysis_results["status"] == "completed":
         conclusion = "success" if analysis_results["issues_found"] == 0 else "neutral"
-        title = f"QA AI Analysis Complete - {analysis_results['total_test_cases']} tests generated"
+        title = f"Qalia.ai Analysis Complete - {analysis_results['total_test_cases']} tests generated"
         summary = f"""
-## 🤖 QA AI Analysis Results
+## 🤖 Qalia.ai Analysis Results
 
 **Target Application:** `{analysis_results['app_url']}`
 
@@ -274,7 +274,7 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
 - **Status:** ✅ Analysis completed successfully
 
 ### 🧪 Generated Tests
-QA AI has automatically generated comprehensive test suites for your application. The tests cover:
+Qalia.ai has automatically generated comprehensive test suites for your application. The tests cover:
 - User interface interactions
 - Navigation flows
 - Form submissions
@@ -287,9 +287,9 @@ QA AI has automatically generated comprehensive test suites for your application
         """
     else:
         conclusion = "failure"
-        title = "QA AI Analysis Failed"
+        title = "Qalia.ai Analysis Failed"
         summary = f"""
-## ❌ QA AI Analysis Failed
+## ❌ Qalia.ai Analysis Failed
 
 **Target Application:** `{analysis_results.get('app_url', 'Unknown')}`
 **Error:** {analysis_results.get('error', 'Unknown error occurred')}
@@ -298,7 +298,7 @@ Please check your application deployment and try again.
         """
     
     check_run = repo.create_check_run(
-        name="QA AI Analysis",
+        name="Qalia.ai Analysis",
         head_sha=commit_sha,
         status="completed",
         conclusion=conclusion,
@@ -317,7 +317,7 @@ async def comment_on_pr(g: Github, repo_name: str, pr_number: int, analysis_resu
     
     if analysis_results["status"] == "completed":
         comment = f"""
-## 🤖 QA AI Analysis Results
+## 🤖 Qalia.ai Analysis Results
 
 I've analyzed your application and generated **{analysis_results['total_test_cases']} test cases**!
 
@@ -336,11 +336,11 @@ I've analyzed your application and generated **{analysis_results['total_test_cas
 The generated tests are available in the workflow artifacts. You can download and integrate them into your testing pipeline.
 
 ---
-*Powered by QA AI - Automated testing for modern web applications*
+*Powered by Qalia.ai - AI-powered QA testing for your repositories*
         """
     else:
         comment = f"""
-## ❌ QA AI Analysis Failed
+## ❌ Qalia.ai Analysis Failed
 
 I encountered an issue while analyzing your application:
 
@@ -350,7 +350,7 @@ I encountered an issue while analyzing your application:
 Please check your application deployment and ensure it's accessible.
 
 ---
-*Powered by QA AI*
+*Powered by Qalia.ai*
         """
     
     pr.create_issue_comment(comment)
