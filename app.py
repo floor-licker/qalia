@@ -372,59 +372,105 @@ async def github_webhook(request: Request):
         logger.info(f"Pull request action: {action}, PR number: {pr_number}")
     
     # Handle different event types
-    if event_type == "pull_request":
-        await handle_pull_request(payload)
-    elif event_type == "push":
-        await handle_push(payload)
-    elif event_type == "installation":
-        logger.info("App installation event received")
-    else:
-        logger.info(f"Unhandled event type: {event_type}")
+    try:
+        if event_type == "pull_request":
+            await handle_pull_request(payload)
+        elif event_type == "push":
+            await handle_push(payload)
+        elif event_type == "installation":
+            logger.info("App installation event received")
+        else:
+            logger.info(f"Unhandled event type: {event_type}")
+    except Exception as e:
+        logger.error(f"Error handling {event_type} event: {e}")
+        # Return success to GitHub to avoid retries, but log the error
+        return {"status": "error", "message": str(e)}
     
     return {"status": "ok"}
 
 async def handle_pull_request(payload: Dict[str, Any]):
     """Handle pull request events."""
-    action = payload.get("action")
-    
-    # Only process opened and synchronize events
-    if action not in ["opened", "synchronize"]:
-        return
-    
-    # Get repository and PR information
-    repo_name = payload["repository"]["full_name"]
-    pr_number = payload["pull_request"]["number"]
-    commit_sha = payload["pull_request"]["head"]["sha"]
-    branch = payload["pull_request"]["head"]["ref"]
-    installation_id = payload["installation"]["id"]
-    
-    logger.info(f"Processing PR #{pr_number} in {repo_name}")
-    
-    # Get GitHub client
-    g = get_github_client(installation_id)
-    
-    # Clone repository to access qalia.yml
-    repo_url = payload["repository"]["clone_url"]
-    repo_path = await clone_repository(repo_url, branch)
-    
     try:
-        # Run QA AI analysis
-        analysis_results = await run_qalia_analysis(repo_url, branch, repo_path)
-    finally:
-        # Clean up cloned repository
-        if repo_path:
-            shutil.rmtree(repo_path, ignore_errors=True)
-    
-    # Get app configuration
-    config = get_app_config()
-    
-    # Create check run if enabled
-    if config["enable_check_runs"]:
-        await create_check_run(g, repo_name, commit_sha, analysis_results)
-    
-    # Comment on PR if enabled
-    if config["enable_pr_comments"]:
-        await comment_on_pr(g, repo_name, pr_number, analysis_results)
+        action = payload.get("action")
+        
+        # Only process opened and synchronize events
+        if action not in ["opened", "synchronize"]:
+            logger.info(f"Skipping PR action: {action}")
+            return
+        
+        # Get repository and PR information
+        repo_name = payload["repository"]["full_name"]
+        pr_number = payload["pull_request"]["number"]
+        commit_sha = payload["pull_request"]["head"]["sha"]
+        branch = payload["pull_request"]["head"]["ref"]
+        installation_id = payload["installation"]["id"]
+        
+        logger.info(f"Processing PR #{pr_number} in {repo_name}, branch: {branch}")
+        
+        # Get GitHub client
+        try:
+            g = get_github_client(installation_id)
+            logger.info("GitHub client created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create GitHub client: {e}")
+            raise
+        
+        # Clone repository to access qalia.yml
+        repo_url = payload["repository"]["clone_url"]
+        logger.info(f"Cloning repository: {repo_url}")
+        repo_path = await clone_repository(repo_url, branch)
+        
+        if not repo_path:
+            logger.error("Failed to clone repository")
+            # Still try to run analysis without repo_path
+        
+        try:
+            # Run QA AI analysis
+            logger.info("Starting QA AI analysis")
+            analysis_results = await run_qalia_analysis(repo_url, branch, repo_path)
+            logger.info(f"QA AI analysis completed: {analysis_results.get('status', 'unknown')}")
+        except Exception as e:
+            logger.error(f"QA AI analysis failed: {e}")
+            # Create error results
+            analysis_results = {
+                "status": "failed",
+                "error": str(e),
+                "app_url": "unknown"
+            }
+        finally:
+            # Clean up cloned repository
+            if repo_path:
+                shutil.rmtree(repo_path, ignore_errors=True)
+                logger.info("Cleaned up cloned repository")
+        
+        # Get app configuration
+        try:
+            config = get_app_config()
+            logger.info(f"App config loaded: {config}")
+        except Exception as e:
+            logger.error(f"Failed to load app config: {e}")
+            # Use default config
+            config = {"enable_check_runs": True, "enable_pr_comments": True}
+        
+        # Create check run if enabled
+        if config["enable_check_runs"]:
+            try:
+                await create_check_run(g, repo_name, commit_sha, analysis_results)
+                logger.info("Check run created successfully")
+            except Exception as e:
+                logger.error(f"Failed to create check run: {e}")
+        
+        # Comment on PR if enabled
+        if config["enable_pr_comments"]:
+            try:
+                await comment_on_pr(g, repo_name, pr_number, analysis_results)
+                logger.info("PR comment created successfully")
+            except Exception as e:
+                logger.error(f"Failed to create PR comment: {e}")
+                
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_pull_request: {e}")
+        raise
 
 async def handle_push(payload: Dict[str, Any]):
     """Handle push events."""
