@@ -38,9 +38,15 @@ GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Read private key from PEM file
+# Read private key from PEM file or environment variable
 def get_private_key() -> str:
-    """Read the private key from the PEM file."""
+    """Read the private key from the PEM file or environment variable."""
+    # Try environment variable first
+    env_key = os.getenv("GITHUB_PRIVATE_KEY")
+    if env_key:
+        return env_key
+    
+    # Fall back to file
     try:
         with open("private-key.pem", "r") as key_file:
             return key_file.read()
@@ -52,7 +58,7 @@ def get_private_key() -> str:
         except FileNotFoundError:
             raise HTTPException(
                 status_code=500,
-                detail="Private key file not found. Please ensure private-key.pem exists in the root directory."
+                detail="Private key not found. Please ensure private-key.pem exists or set GITHUB_PRIVATE_KEY environment variable."
             )
 
 def verify_webhook_signature(request_body: bytes, signature: str) -> bool:
