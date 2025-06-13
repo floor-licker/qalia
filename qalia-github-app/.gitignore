@@ -39,4 +39,4 @@ logs/
 .DS_Store
 
 # Allow private key for deployment
-!app/private-key.pem 
+!app/private-key.pem app/private-key.pem
