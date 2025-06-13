@@ -9,16 +9,12 @@ from github import Github
 import jwt
 import time
 import asyncio
-import sys
 import tempfile
 import shutil
 from pathlib import Path
 import logging
 
-# Add the parent directory to Python path to import QA AI modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-# Import QA AI functionality
+# Import QA AI functionality from the current directory
 try:
     from main import run_complete_pipeline
     from scripts.run_exploration import run_exploration
@@ -28,10 +24,10 @@ except ImportError as e:
     # For development/testing, we'll handle this gracefully
     run_complete_pipeline = None
 
-# Import local configuration
+# Import configuration
 from config import get_deployment_url, get_app_config, validate_config
 
-app = FastAPI(title="QALIA GitHub App")
+app = FastAPI(title="QALIA GitHub App", description="AI-powered QA testing for your repositories")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,17 +42,17 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 def get_private_key() -> str:
     """Read the private key from the PEM file."""
     try:
-        with open("app/private-key.pem", "r") as key_file:
+        with open("private-key.pem", "r") as key_file:
             return key_file.read()
     except FileNotFoundError:
         # Try alternative locations
         try:
-            with open("private-key.pem", "r") as key_file:
+            with open("app/private-key.pem", "r") as key_file:
                 return key_file.read()
         except FileNotFoundError:
             raise HTTPException(
                 status_code=500,
-                detail="Private key file not found. Please ensure private-key.pem exists."
+                detail="Private key file not found. Please ensure private-key.pem exists in the root directory."
             )
 
 def verify_webhook_signature(request_body: bytes, signature: str) -> bool:
@@ -201,11 +197,10 @@ QA AI has automatically generated comprehensive test suites for your application
         summary = f"""
 ## ❌ QA AI Analysis Failed
 
-**Error:** {analysis_results.get('error', 'Unknown error')}
-
 **Target Application:** `{analysis_results.get('app_url', 'Unknown')}`
+**Error:** {analysis_results.get('error', 'Unknown error occurred')}
 
-Please check your application deployment and ensure it's accessible for analysis.
+Please check your application deployment and try again.
         """
     
     check_run = repo.create_check_run(
@@ -222,41 +217,35 @@ Please check your application deployment and ensure it's accessible for analysis
     return check_run
 
 async def comment_on_pr(g: Github, repo_name: str, pr_number: int, analysis_results: Dict[str, Any]):
-    """Add a comment to the PR with QA AI results."""
+    """Comment on a pull request with QA AI results."""
     repo = g.get_repo(repo_name)
     pr = repo.get_pull(pr_number)
     
     if analysis_results["status"] == "completed":
-        comment_body = f"""
+        comment = f"""
 ## 🤖 QA AI Analysis Results
 
-I've automatically analyzed your application and generated comprehensive test suites!
+I've analyzed your application and generated **{analysis_results['total_test_cases']} test cases**!
 
 ### 📊 Summary
-- **Target Application:** `{analysis_results['app_url']}`
-- **Test Cases Generated:** **{analysis_results['total_test_cases']}**
+- **Target URL:** `{analysis_results['app_url']}`
 - **Issues Found:** {analysis_results['issues_found']}
+- **Status:** ✅ Analysis completed
 
-### 🧪 What's Generated
-QA AI has created test files for multiple frameworks:
-- **Playwright** - End-to-end browser tests
-- **Cypress** - Modern web testing
-- **Jest** - Unit and integration tests
+### 🧪 What I Generated
+- Comprehensive test suites covering your application
+- User interaction tests
+- Navigation flow tests
+- Form validation tests
+- Error handling scenarios
 
-### 🚀 How to Use
-1. The generated tests are available in the workflow artifacts
-2. Download and integrate them into your testing pipeline
-3. Run the tests as part of your CI/CD process
+The generated tests are available in the workflow artifacts. You can download and integrate them into your testing pipeline.
 
-### 💡 Benefits
-- **Comprehensive Coverage** - Tests generated from actual user interactions
-- **Multiple Frameworks** - Choose the testing framework that fits your stack
-- **Ready to Run** - Tests are pre-configured and executable
-
-*This analysis was performed automatically by QA AI. The tests are generated based on autonomous exploration of your deployed application.*
+---
+*Powered by QA AI - Automated testing for modern web applications*
         """
     else:
-        comment_body = f"""
+        comment = f"""
 ## ❌ QA AI Analysis Failed
 
 I encountered an issue while analyzing your application:
@@ -264,150 +253,111 @@ I encountered an issue while analyzing your application:
 **Error:** {analysis_results.get('error', 'Unknown error')}
 **Target URL:** `{analysis_results.get('app_url', 'Unknown')}`
 
-### 🔧 Troubleshooting
-- Ensure your application is deployed and accessible
-- Check that the deployment URL is correct
-- Verify the application is fully loaded before analysis
+Please check your application deployment and ensure it's accessible.
 
-*This is an automated comment from QA AI. Please check your deployment status and try again.*
+---
+*Powered by QA AI*
         """
     
-    pr.create_issue_comment(comment_body)
+    pr.create_issue_comment(comment)
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {"status": "QA AI GitHub App is running", "version": "1.0.0"}
+    """Root endpoint with basic information."""
+    return {"message": "QA AI GitHub App is running", "status": "healthy"}
 
 @app.post("/webhook")
 async def github_webhook(request: Request):
     """Handle GitHub webhook events."""
-    # Get the signature from headers
-    signature = request.headers.get("X-Hub-Signature-256")
-    if not signature:
-        raise HTTPException(status_code=401, detail="No signature provided")
-    
-    # Get the event type
-    event_type = request.headers.get("X-GitHub-Event")
-    if not event_type:
-        raise HTTPException(status_code=400, detail="No event type provided")
-    
-    # Get the request body
+    # Get request body and signature
     body = await request.body()
+    signature = request.headers.get("X-Hub-Signature-256", "")
     
-    # Verify the signature
+    # Verify webhook signature
     if not verify_webhook_signature(body, signature):
-        raise HTTPException(status_code=401, detail="Invalid signature")
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
     
-    # Parse the payload
-    payload = json.loads(body)
+    # Parse payload
+    try:
+        payload = json.loads(body.decode())
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    
+    # Get event type
+    event_type = request.headers.get("X-GitHub-Event")
+    
+    logger.info(f"Received {event_type} event")
     
     # Handle different event types
-    try:
-        if event_type == "pull_request":
-            await handle_pull_request(payload)
-        elif event_type == "push":
-            await handle_push(payload)
-        else:
-            logger.info(f"Ignoring event type: {event_type}")
-    except Exception as e:
-        logger.error(f"Error handling {event_type} event: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing webhook: {str(e)}")
+    if event_type == "pull_request":
+        await handle_pull_request(payload)
+    elif event_type == "push":
+        await handle_push(payload)
+    elif event_type == "installation":
+        logger.info("App installation event received")
+    else:
+        logger.info(f"Unhandled event type: {event_type}")
     
-    return JSONResponse({"status": "success"})
+    return {"status": "ok"}
 
 async def handle_pull_request(payload: Dict[str, Any]):
     """Handle pull request events."""
     action = payload.get("action")
+    
+    # Only process opened and synchronize events
     if action not in ["opened", "synchronize"]:
-        logger.info(f"Ignoring PR action: {action}")
         return
     
-    pr = payload.get("pull_request", {})
-    repository = payload.get("repository", {})
-    installation_id = payload.get("installation", {}).get("id")
-    
-    if not installation_id:
-        raise HTTPException(status_code=400, detail="No installation ID provided")
-    
-    repo_name = repository.get("full_name")
-    pr_number = pr.get("number")
-    commit_sha = pr.get("head", {}).get("sha")
+    # Get repository and PR information
+    repo_name = payload["repository"]["full_name"]
+    pr_number = payload["pull_request"]["number"]
+    commit_sha = payload["pull_request"]["head"]["sha"]
+    branch = payload["pull_request"]["head"]["ref"]
+    installation_id = payload["installation"]["id"]
     
     logger.info(f"Processing PR #{pr_number} in {repo_name}")
     
-    # Get authenticated GitHub client
+    # Get GitHub client
     g = get_github_client(installation_id)
     
-    # Create initial check run
-    repo = g.get_repo(repo_name)
-    check_run = repo.create_check_run(
-        name="QA AI Analysis",
-        head_sha=commit_sha,
-        status="in_progress",
-        output={
-            "title": "Running QA AI Analysis...",
-            "summary": "🤖 QA AI is analyzing your application and generating test cases. This may take a few minutes."
-        }
-    )
+    # Run QA AI analysis
+    analysis_results = await run_qalia_analysis(repo_name, branch)
     
-    try:
-        # Run QA AI analysis
-        analysis_results = await run_qalia_analysis(repo_name)
-        
-        # Update check run with results
+    # Get app configuration
+    config = get_app_config()
+    
+    # Create check run if enabled
+    if config["enable_check_runs"]:
         await create_check_run(g, repo_name, commit_sha, analysis_results)
-        
-        # Comment on PR
+    
+    # Comment on PR if enabled
+    if config["enable_pr_comments"]:
         await comment_on_pr(g, repo_name, pr_number, analysis_results)
-        
-        logger.info(f"QA AI analysis completed for PR #{pr_number}")
-        
-    except Exception as e:
-        # Update check run with failure
-        check_run.edit(
-            status="completed",
-            conclusion="failure",
-            output={
-                "title": "QA AI Analysis Failed",
-                "summary": f"❌ Analysis failed: {str(e)}"
-            }
-        )
-        logger.error(f"QA AI analysis failed for PR #{pr_number}: {e}")
 
 async def handle_push(payload: Dict[str, Any]):
-    """Handle push events to main branch."""
-    ref = payload.get("ref")
-    if ref != "refs/heads/main":
-        logger.info(f"Ignoring push to {ref}")
+    """Handle push events."""
+    # Only process pushes to main/master branch
+    ref = payload.get("ref", "")
+    if not ref.endswith("/main") and not ref.endswith("/master"):
         return
     
-    repository = payload.get("repository", {})
-    installation_id = payload.get("installation", {}).get("id")
+    # Get repository information
+    repo_name = payload["repository"]["full_name"]
+    commit_sha = payload["head_commit"]["id"]
+    branch = ref.split("/")[-1]
+    installation_id = payload["installation"]["id"]
     
-    if not installation_id:
-        raise HTTPException(status_code=400, detail="No installation ID provided")
+    logger.info(f"Processing push to {branch} in {repo_name}")
     
-    repo_name = repository.get("full_name")
-    commit_sha = payload.get("after")
-    
-    logger.info(f"Processing push to main in {repo_name}")
-    
-    # Get authenticated GitHub client
+    # Get GitHub client
     g = get_github_client(installation_id)
     
-    try:
-        # Run QA AI analysis
-        analysis_results = await run_qalia_analysis(repo_name)
-        
-        # Create check run with results
-        await create_check_run(g, repo_name, commit_sha, analysis_results)
-        
-        logger.info(f"QA AI analysis completed for push to {repo_name}")
-        
-    except Exception as e:
-        logger.error(f"QA AI analysis failed for push to {repo_name}: {e}")
+    # Run QA AI analysis
+    analysis_results = await run_qalia_analysis(repo_name, branch)
+    
+    # Create check run
+    await create_check_run(g, repo_name, commit_sha, analysis_results)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000))) 

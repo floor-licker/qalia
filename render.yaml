@@ -5,7 +5,7 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       playwright install chromium --with-deps
-    startCommand: uvicorn app.server:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GITHUB_APP_ID
         sync: false
@@ -30,7 +30,4 @@ services:
         sync: false
       - key: ENABLE_CHECK_RUNS
         value: "true"
-        sync: false
-    # Ensure the private key file is included in the deployment
-    include:
-      - app/private-key.pem 
+        sync: false 
