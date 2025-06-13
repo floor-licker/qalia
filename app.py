@@ -100,13 +100,30 @@ def get_github_client(installation_id: int) -> Github:
         algorithm="RS256"
     )
     
-    # Get installation access token
-    g = Github(jwt=jwt_token)
-    installation = g.get_installation(installation_id)
-    token = installation.get_access_token()
+    # Get installation access token using direct API call
+    import requests
+    headers = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "Qalia-GitHub-App"
+    }
+    
+    response = requests.post(
+        f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+        headers=headers
+    )
+    
+    if response.status_code != 201:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to get installation token: {response.status_code} {response.text}"
+        )
+    
+    token_data = response.json()
+    access_token = token_data["token"]
     
     # Return client with installation token
-    return Github(token.token)
+    return Github(access_token)
 
 async def clone_repository(repo_url: str, branch: str = "main") -> str:
     """Clone repository to a temporary directory and return the path."""
