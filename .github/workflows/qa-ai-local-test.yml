@@ -18,7 +18,7 @@ jobs:
     # 1. Basic Setup
     - name: Checkout QA AI Source Code
       uses: actions/checkout@v4
-      
+        
     - name: Setup Python
       uses: actions/setup-python@v4
       with:

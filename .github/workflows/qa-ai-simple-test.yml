@@ -33,9 +33,9 @@ jobs:
     - name: Test QA AI Module Imports
       run: |
         echo "📦 Testing QA AI module imports..."
-        python3 -c "
-        import sys
-        sys.path.insert(0, '.')
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
         
         print('Testing QA AI imports...')
         try:
@@ -45,17 +45,17 @@ jobs:
             print('❌ main.py import error:', e)
             sys.exit(1)
         
-        try:
-            from scripts.run_exploration import run_exploration
-            print('✅ run_exploration imported successfully')
-        except Exception as e:
+          try:
+              from scripts.run_exploration import run_exploration
+              print('✅ run_exploration imported successfully')
+          except Exception as e:
             print('❌ run_exploration import error:', e)
             sys.exit(1)
-            
-        try:
-            from generators import TestCaseGenerator
-            print('✅ TestCaseGenerator imported successfully')
-        except Exception as e:
+          
+          try:
+              from generators import TestCaseGenerator
+              print('✅ TestCaseGenerator imported successfully')
+          except Exception as e:
             print('❌ TestCaseGenerator import error:', e)
             sys.exit(1)
         

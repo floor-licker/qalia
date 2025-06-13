@@ -88,7 +88,7 @@ htmlcov/
 # mypy
 .mypy_cache/
 .dmypy.json
-dmypy.json
+dmypy.json 
 
 # Ignore environment variable and secret files
 .env.*
