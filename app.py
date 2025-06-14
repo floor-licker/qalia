@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 import hmac
 import hashlib
@@ -481,7 +481,7 @@ async def root():
     return {"message": "QA AI GitHub App is running", "status": "healthy"}
 
 @app.post("/webhook")
-async def github_webhook(request: Request):
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """Handle GitHub webhook events."""
     # Get request body and signature
     body = await request.body()
@@ -519,22 +519,20 @@ async def github_webhook(request: Request):
             if "head" in payload["pull_request"]:
                 logger.info(f"Head keys: {list(payload['pull_request']['head'].keys())}")
     
-    # Handle different event types
-    try:
-        if event_type == "pull_request":
-            await handle_pull_request(payload)
-        elif event_type == "push":
-            await handle_push(payload)
-        elif event_type == "installation":
-            logger.info("App installation event received")
-        else:
-            logger.info(f"Unhandled event type: {event_type}")
-    except Exception as e:
-        logger.error(f"Error handling {event_type} event: {e}")
-        # Return success to GitHub to avoid retries, but log the error
-        return {"status": "error", "message": str(e)}
+    # Handle different event types in background
+    if event_type == "pull_request":
+        background_tasks.add_task(handle_pull_request, payload)
+        logger.info("Pull request analysis queued for background processing")
+    elif event_type == "push":
+        background_tasks.add_task(handle_push, payload)
+        logger.info("Push analysis queued for background processing")
+    elif event_type == "installation":
+        logger.info("App installation event received")
+    else:
+        logger.info(f"Unhandled event type: {event_type}")
     
-    return {"status": "ok"}
+    # Return immediately to GitHub
+    return {"status": "ok", "message": "Webhook received, processing in background"}
 
 async def handle_pull_request(payload: Dict[str, Any]):
     """Handle pull request events."""
@@ -573,10 +571,20 @@ async def handle_pull_request(payload: Dict[str, Any]):
             # Still try to run analysis without repo_path
         
         try:
-            # Run QA AI analysis
+            # Run QA AI analysis with timeout
             logger.info("Starting QA AI analysis")
-            analysis_results = await run_qalia_analysis(repo_url, branch, repo_path)
+            analysis_results = await asyncio.wait_for(
+                run_qalia_analysis(repo_url, branch, repo_path),
+                timeout=600  # 10 minutes timeout
+            )
             logger.info(f"QA AI analysis completed: {analysis_results.get('status', 'unknown')}")
+        except asyncio.TimeoutError:
+            logger.error("QA AI analysis timed out after 10 minutes")
+            analysis_results = {
+                "status": "failed",
+                "error": "Analysis timed out after 10 minutes",
+                "app_url": "unknown"
+            }
         except Exception as e:
             logger.error(f"QA AI analysis failed: {e}")
             # Create error results

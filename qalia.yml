@@ -1,5 +1,6 @@
 # Qalia Configuration for Demo Web App
 # This file tells Qalia how to deploy and test this simple HTML application
+# Real-time test trigger: 2025-01-14 01:11:00
 
 # Application deployment configuration
 deployment:
@@ -33,7 +34,7 @@ testing:
   # Exploration settings
   exploration:
     max_depth: 2  # Simple site, don't need deep exploration
-    timeout: 120  # Shorter timeout for simple site
+    timeout: 60   # Very short timeout for demo - 1 minute
     headless: true
     viewport:
       width: 1920

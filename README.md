@@ -291,3 +291,13 @@ demo-web-app/                   # Demonstration website
 > **Note**: QA AI doesn't test itself! The `qalia` repository contains the tool's source code, while `demo-web-app` showcases how to use QA AI on actual web applications.
 
 ## 🎯 **Quick Start**
+
+# Demo Web App
+
+A comprehensive demo web application showcasing various features and functionalities for testing purposes.
+
+## Real-time Qalia.ai Testing
+
+This PR is created to test the Qalia.ai GitHub App in real-time monitoring mode.
+
+**Test timestamp:** $(date)
