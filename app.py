@@ -158,6 +158,18 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
     if not run_complete_pipeline or not get_application_url:
         raise HTTPException(status_code=500, detail="QA AI modules not available")
     
+    # Ensure Playwright browsers are installed
+    try:
+        logger.info("Checking Playwright browser installation...")
+        result = subprocess.run(["python", "-m", "playwright", "install", "--with-deps"], 
+                              capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            logger.info("Playwright browsers installed successfully")
+        else:
+            logger.warning(f"Playwright install warning: {result.stderr}")
+    except Exception as e:
+        logger.warning(f"Could not install Playwright browsers: {e}")
+    
     try:
         # Determine application URL using qalia.yml or fallback to old method
         if repo_path and get_application_url:
