@@ -512,6 +512,12 @@ async def github_webhook(request: Request):
         action = payload.get("action", "unknown")
         pr_number = payload.get("pull_request", {}).get("number", "unknown")
         logger.info(f"Pull request action: {action}, PR number: {pr_number}")
+        # Debug: log the payload structure
+        logger.info(f"Payload keys: {list(payload.keys())}")
+        if "pull_request" in payload:
+            logger.info(f"Pull request keys: {list(payload['pull_request'].keys())}")
+            if "head" in payload["pull_request"]:
+                logger.info(f"Head keys: {list(payload['pull_request']['head'].keys())}")
     
     # Handle different event types
     try:
@@ -544,7 +550,7 @@ async def handle_pull_request(payload: Dict[str, Any]):
         repo_name = payload["repository"]["full_name"]
         pr_number = payload["pull_request"]["number"]
         commit_sha = payload["pull_request"]["head"]["sha"]
-        branch = payload["pull_request"]["head"]["ref"]
+        branch = payload["pull_request"]["head"].get("ref", "main")  # Use .get() with default
         installation_id = payload["installation"]["id"]
         
         logger.info(f"Processing PR #{pr_number} in {repo_name}, branch: {branch}")
