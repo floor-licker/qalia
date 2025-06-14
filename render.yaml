@@ -4,8 +4,6 @@ services:
     env: python
     buildCommand: |
       pip install -r requirements.txt
-      python -m playwright install
-      python -m playwright install-deps
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GITHUB_APP_ID
