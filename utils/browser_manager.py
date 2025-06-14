@@ -27,7 +27,18 @@ class BrowserConfig:
     
     def __post_init__(self):
         if self.args is None:
-            self.args = ['--no-sandbox', '--disable-dev-shm-usage']
+            self.args = [
+                '--no-sandbox', 
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-field-trial-config',
+                '--disable-ipc-flooding-protection'
+            ]
 
 
 class BrowserManager:
@@ -67,11 +78,34 @@ class BrowserManager:
             # Start Playwright
             self.playwright = await async_playwright().start()
             
-            # Launch browser
-            self.browser = await self.playwright.chromium.launch(
-                headless=self.config.headless,
-                args=self.config.args
-            )
+            # Launch browser - try different browsers if chromium fails
+            try:
+                logger.info("Attempting to launch Chromium...")
+                self.browser = await self.playwright.chromium.launch(
+                    headless=self.config.headless,
+                    args=self.config.args
+                )
+                logger.info("✅ Chromium launched successfully")
+            except Exception as chromium_error:
+                logger.warning(f"Chromium launch failed: {chromium_error}")
+                try:
+                    logger.info("Attempting to launch Firefox...")
+                    self.browser = await self.playwright.firefox.launch(
+                        headless=self.config.headless,
+                        args=['--no-sandbox'] if self.config.headless else []
+                    )
+                    logger.info("✅ Firefox launched successfully")
+                except Exception as firefox_error:
+                    logger.warning(f"Firefox launch failed: {firefox_error}")
+                    try:
+                        logger.info("Attempting to launch WebKit...")
+                        self.browser = await self.playwright.webkit.launch(
+                            headless=self.config.headless
+                        )
+                        logger.info("✅ WebKit launched successfully")
+                    except Exception as webkit_error:
+                        logger.error(f"All browsers failed to launch. WebKit error: {webkit_error}")
+                        raise Exception("No browsers available for launch")
             
             # Create context
             self.context = await self.browser.new_context(

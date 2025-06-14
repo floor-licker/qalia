@@ -161,12 +161,22 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
     # Ensure Playwright browsers are installed
     try:
         logger.info("Checking Playwright browser installation...")
-        result = subprocess.run(["python", "-m", "playwright", "install", "--with-deps"], 
+        # Try installing chromium specifically
+        result = subprocess.run(["python", "-m", "playwright", "install", "chromium"], 
                               capture_output=True, text=True, timeout=300)
         if result.returncode == 0:
-            logger.info("Playwright browsers installed successfully")
+            logger.info("Playwright chromium installed successfully")
         else:
             logger.warning(f"Playwright install warning: {result.stderr}")
+            
+        # Also try installing system dependencies
+        deps_result = subprocess.run(["python", "-m", "playwright", "install-deps"], 
+                                   capture_output=True, text=True, timeout=300)
+        if deps_result.returncode == 0:
+            logger.info("Playwright dependencies installed successfully")
+        else:
+            logger.warning(f"Playwright deps warning: {deps_result.stderr}")
+            
     except Exception as e:
         logger.warning(f"Could not install Playwright browsers: {e}")
     
