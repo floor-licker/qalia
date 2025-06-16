@@ -485,7 +485,7 @@ async def root():
     return {"message": "QA AI GitHub App is running", "status": "healthy"}
 
 @app.post("/webhook")
-async def github_webhook(request: Request, background_tasks: BackgroundTasks):
+async def github_webhook(request: Request):
     """Handle GitHub webhook events."""
     # Get request body and signature
     body = await request.body()
@@ -523,24 +523,29 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             if "head" in payload["pull_request"]:
                 logger.info(f"Head keys: {list(payload['pull_request']['head'].keys())}")
     
-    # Handle different event types in background
+    # Handle different event types in background using asyncio.create_task for true async
     if event_type == "pull_request":
-        background_tasks.add_task(handle_pull_request, payload)
-        logger.info("Pull request analysis queued for background processing")
+        # Create a fire-and-forget task that doesn't block the response
+        asyncio.create_task(handle_pull_request(payload))
+        logger.info("Pull request analysis started in background")
     elif event_type == "push":
-        background_tasks.add_task(handle_push, payload)
-        logger.info("Push analysis queued for background processing")
+        # Create a fire-and-forget task that doesn't block the response
+        asyncio.create_task(handle_push(payload))
+        logger.info("Push analysis started in background")
     elif event_type == "installation":
         logger.info("App installation event received")
     else:
         logger.info(f"Unhandled event type: {event_type}")
     
-    # Return immediately to GitHub
+    # Return immediately to GitHub without waiting for background tasks
     return {"status": "ok", "message": "Webhook received, processing in background"}
 
 async def handle_pull_request(payload: Dict[str, Any]):
     """Handle pull request events."""
     try:
+        logger.info("=== STARTING PULL REQUEST ANALYSIS ===")
+        # Add some delay to ensure the webhook response is returned first
+        await asyncio.sleep(1)
         action = payload.get("action")
         
         # Only process opened and synchronize events
@@ -654,7 +659,10 @@ I'll update this comment with detailed results when the analysis is complete.
                 
     except Exception as e:
         logger.error(f"Unexpected error in handle_pull_request: {e}")
-        raise
+        # Don't re-raise in background tasks to prevent crashing the event loop
+        logger.error("Pull request analysis failed, but continuing...")
+    finally:
+        logger.info("=== PULL REQUEST ANALYSIS COMPLETE ===")
 
 async def handle_push(payload: Dict[str, Any]):
     """Handle push events."""
