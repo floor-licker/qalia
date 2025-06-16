@@ -484,6 +484,30 @@ async def root():
     """Root endpoint with basic information."""
     return {"message": "QA AI GitHub App is running", "status": "healthy"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and deployment verification."""
+    try:
+        # Check basic functionality
+        config_status = "ok" if GITHUB_APP_ID and GITHUB_WEBHOOK_SECRET else "missing_config"
+        
+        # Check if we can import core modules
+        import_status = "ok" if run_complete_pipeline is not None else "import_error"
+        
+        return {
+            "status": "healthy",
+            "timestamp": time.time(),
+            "config": config_status,
+            "imports": import_status,
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "error": str(e),
+            "timestamp": time.time()
+        }
+
 @app.post("/webhook")
 async def github_webhook(request: Request):
     """Handle GitHub webhook events."""

@@ -1,0 +1,78 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests (if any)
+      run: |
+        # Add your test commands here
+        echo "Running tests..."
+        # python -m pytest tests/ || true
+
+    - name: Deploy to DigitalOcean
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USERNAME }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        script: |
+          # Navigate to application directory
+          cd /opt/qalia || {
+            echo "Creating application directory..."
+            mkdir -p /opt/qalia
+            cd /opt/qalia
+            git clone https://github.com/${{ github.repository }} .
+          }
+          
+          # Pull latest changes
+          echo "Pulling latest code..."
+          git fetch origin
+          git reset --hard origin/${{ github.ref_name }}
+          
+          # Update Python dependencies
+          echo "Updating dependencies..."
+          source venv/bin/activate || {
+            echo "Creating virtual environment..."
+            python3.11 -m venv venv
+            source venv/bin/activate
+          }
+          
+          pip install -r requirements.txt
+          
+          # Update Playwright if needed
+          playwright install
+          
+          # Restart the service
+          echo "Restarting Qalia service..."
+          systemctl daemon-reload
+          systemctl restart qalia
+          systemctl status qalia --no-pager
+          
+          echo "Deployment completed successfully!"
+
+    - name: Health Check
+      run: |
+        echo "Waiting for service to start..."
+        sleep 10
+        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting" 
