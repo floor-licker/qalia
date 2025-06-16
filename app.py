@@ -31,7 +31,7 @@ except ImportError as e:
     get_application_url = None
 
 # Import configuration
-from github_config import get_deployment_url, get_app_config, validate_config
+from github_config import get_app_config, validate_config
 
 app = FastAPI(title="QALIA GitHub App", description="AI-powered QA testing for your repositories")
 
