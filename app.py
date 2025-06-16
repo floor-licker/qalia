@@ -308,6 +308,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                     "headless": exploration_config.get("headless", True),
                     "max_depth": exploration_config.get("max_depth", 3),
                     "timeout": exploration_config.get("timeout", 300),
+                    "action_timeout": exploration_config.get("action_timeout", 15000),
+                    "navigation_timeout": exploration_config.get("navigation_timeout", 60000),
                     "output_dir": temp_dir
                 }
                 
@@ -321,6 +323,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                     "headless": True,
                     "max_depth": 3,
                     "timeout": 300,
+                    "action_timeout": 15000,
+                    "navigation_timeout": 60000,
                     "output_dir": temp_dir
                 }
                 

@@ -42,6 +42,7 @@ class ExplorationConfig:
     exploration_timeout: int = 300
     capture_screenshots: bool = True
     max_depth: int = 3  # BFS depth limit
+    navigation_timeout: int = 60000  # 60 seconds for page navigation
 
 
 class CleanWebExplorer:
@@ -97,9 +98,12 @@ class CleanWebExplorer:
         self.config = config or ExplorationConfig()
         
         # Initialize core components
+        # Use longer timeout for navigation, especially for cloud environments
+        navigation_timeout = getattr(self.config, 'navigation_timeout', 60000)  # Default 60s
+        
         self.browser_manager = BrowserManager(BrowserConfig(
             headless=self.config.headless,
-            timeout=self.config.action_timeout
+            timeout=navigation_timeout  # Use navigation timeout instead of action timeout
         ))
         
         self.element_extractor = ElementExtractor(base_url) if ElementExtractor is not None else None
