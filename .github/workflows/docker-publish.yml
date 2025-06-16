@@ -14,6 +14,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Only run on the production repository, not the backup
+    if: github.repository == 'webisoftsoftware/qalia'
     permissions:
       contents: read
       packages: write
