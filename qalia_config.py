@@ -15,6 +15,7 @@ import shutil
 from typing import Dict, Any, List, Optional
 import logging
 from pathlib import Path
+import socket
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,9 @@ class DeploymentManager:
         # For static sites, we can serve them directly
         port = self.deployment_config.get("port", 8080)
         
+        # Try to find an available port if the default is taken
+        port = self._find_available_port(port)
+        
         # Run build commands if specified
         await self._run_build_commands()
         
@@ -140,6 +144,20 @@ class DeploymentManager:
         await self._wait_for_ready(url)
         return url
     
+    def _find_available_port(self, preferred_port: int) -> int:
+        """Find an available port starting from preferred_port."""
+        for port in range(preferred_port, preferred_port + 100):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('localhost', port))
+                    logger.info(f"Found available port: {port}")
+                    return port
+            except OSError:
+                continue
+        
+        # If no port found in range, raise error
+        raise RuntimeError(f"No available ports found in range {preferred_port}-{preferred_port + 100}")
+    
     async def _deploy_npm(self) -> str:
         """Deploy a Node.js application."""
         # Run build commands
@@ -149,6 +167,9 @@ class DeploymentManager:
         start_config = self.deployment_config.get("start", {})
         command = start_config.get("command", "npm start")
         port = start_config.get("port", 3000)
+        
+        # Try to find an available port if the default is taken
+        port = self._find_available_port(port)
         
         # Set environment variables
         env = os.environ.copy()
@@ -181,6 +202,9 @@ class DeploymentManager:
         command = start_config.get("command", "python app.py")
         port = start_config.get("port", 5000)
         
+        # Try to find an available port if the default is taken
+        port = self._find_available_port(port)
+        
         self.process = subprocess.Popen(command, shell=True, cwd=self.repo_path)
         
         url = f"http://localhost:{port}"
@@ -192,6 +216,9 @@ class DeploymentManager:
         docker_config = self.deployment_config.get("docker", {})
         image_name = docker_config.get("image", "qalia-test-app")
         port = docker_config.get("port", 3000)
+        
+        # Try to find an available port if the default is taken
+        port = self._find_available_port(port)
         
         # Build Docker image
         build_cmd = f"docker build -t {image_name} ."
