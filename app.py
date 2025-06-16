@@ -268,20 +268,29 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
         logger.warning(f"Browser setup warning: {e}")
     
     try:
-        # Determine application URL using qalia.yml or fallback to old method
-        if repo_path and get_application_url:
-            try:
+        # Check if qalia.yml exists first
+        if repo_path:
+            config_path = os.path.join(repo_path, "qalia.yml")
+            if os.path.exists(config_path):
+                if not get_application_url:
+                    raise HTTPException(status_code=500, detail="QA AI modules not available for qalia.yml deployment")
+                
+                # qalia.yml exists - deploy according to its specification (no fallback!)
+                logger.info("Found qalia.yml - deploying application according to specification")
                 app_url = await get_application_url(repo_path)
-                logger.info(f"Using qalia.yml configuration, app deployed at: {app_url}")
-            except Exception as e:
-                logger.warning(f"Failed to use qalia.yml deployment: {e}")
-                # Fallback to old method
-                app_url = get_deployment_url(repo_url, branch)
-                logger.info(f"Falling back to configured deployment URL: {app_url}")
+                logger.info(f"Application deployed successfully at: {app_url}")
+            else:
+                # No qalia.yml - fail with clear error message
+                raise HTTPException(
+                    status_code=400, 
+                    detail="No qalia.yml configuration found. Please add a qalia.yml file to specify how to deploy your application for testing."
+                )
         else:
-            # Use old configuration method
-            app_url = get_deployment_url(repo_url, branch)
-            logger.info(f"Using configured deployment URL: {app_url}")
+            # No repo_path - this shouldn't happen in normal operation
+            raise HTTPException(
+                status_code=500, 
+                detail="Repository not cloned - cannot proceed with analysis"
+            )
         
         # Load qalia.yml configuration if available
         config = None
