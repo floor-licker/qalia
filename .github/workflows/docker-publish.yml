@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: webisoftSoftware/qalia
+  IMAGE_NAME: webisoftsoftware/qalia
 
 jobs:
   build-and-push:
