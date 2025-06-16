@@ -45,30 +45,16 @@ def get_deployment_url(repo_name: str, branch: str = "main") -> str:
         logger.info(f"Using generic deployment URL pattern: {url}")
         return url
     
-    # Strategy 3: Common hosting platform patterns
+    # Strategy 3: No fallback patterns - require explicit configuration
     app_name = repo_name.split("/")[-1]
     org_name = repo_name.split("/")[0]
     
-    # Try common patterns (you can customize these based on your needs)
-    patterns = [
-        f"https://{app_name}.herokuapp.com",  # Heroku
-        f"https://{app_name}.vercel.app",     # Vercel
-        f"https://{app_name}.netlify.app",    # Netlify
-        f"https://{org_name}.github.io/{app_name}",  # GitHub Pages
-        f"https://{app_name}-{org_name}.web.app",    # Firebase
-        f"https://{app_name}.{org_name}.com", # Custom domain pattern
-        f"https://{app_name}.onrender.com",   # Render
-    ]
-    
-    # For now, default to Heroku pattern
-    # In a production app, you might want to:
-    # 1. Check if the URL is accessible
-    # 2. Look for deployment status in GitHub
-    # 3. Parse a config file from the repo
-    
-    default_url = patterns[0]  # Heroku pattern
-    logger.info(f"Using default deployment URL pattern: {default_url}")
-    return default_url
+    # No more fallback patterns - configuration must be explicit
+    raise ValueError(
+        f"No deployment URL configured for repository '{repo_name}'. "
+        f"Please set either DEPLOY_URL_{repo_name.replace('/', '_').replace('-', '_').upper()} "
+        f"or DEFAULT_DEPLOY_URL environment variable, or use qalia.yml configuration."
+    )
 
 def get_app_config() -> Dict[str, Any]:
     """Get application configuration from environment variables."""
