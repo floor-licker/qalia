@@ -28,15 +28,15 @@ if ! command -v node &> /dev/null; then
     apt install -y nodejs
 fi
 
-# Install Python 3.11 and pip
-echo "🐍 Installing Python 3.11..."
-apt install -y python3.11 python3.11-pip python3.11-venv python3.11-dev
+# Install Python 3.12 and pip (Ubuntu 24.10 default)
+echo "🐍 Installing Python 3.12..."
+apt install -y python3.12-dev python3.12-venv python3-pip
 
-# Install system dependencies for Playwright
+# Install system dependencies for Playwright (Ubuntu 24.10 compatible)
 echo "🎭 Installing Playwright system dependencies..."
 apt install -y \
     libnss3 \
-    libatk-bridge2.0-0 \
+    libatk-bridge2.0-0t64 \
     libdrm2 \
     libxkbcommon0 \
     libxcomposite1 \
@@ -44,9 +44,9 @@ apt install -y \
     libxrandr2 \
     libgbm1 \
     libxss1 \
-    libasound2 \
-    libatspi2.0-0 \
-    libgtk-3-0
+    libasound2t64 \
+    libatspi2.0-0t64 \
+    libgtk-3-0t64
 
 # Create application directory if it doesn't exist
 if [ ! -d "/opt/qalia" ]; then
