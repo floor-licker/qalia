@@ -209,21 +209,30 @@ async def clone_repository(repo_url: str, branch: str = "main", access_token: st
     """Clone repository to a temporary directory and return the path."""
     temp_dir = tempfile.mkdtemp()
     try:
-        # Use token-authenticated URL if token is provided
-        if access_token and repo_url.startswith("https://github.com/"):
-            # Convert to authenticated URL
-            repo_url = repo_url.replace("https://github.com/", f"https://x-access-token:{access_token}@github.com/")
-        
-        # Clone the repository
+        # First try without authentication for public repos
+        logger.info(f"Attempting to clone repository: {repo_url}")
         cmd = f"git clone --branch {branch} --depth 1 {repo_url} {temp_dir}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         
+        # If that fails and we have an access token, try with authentication
+        if result.returncode != 0 and access_token and repo_url.startswith("https://github.com/"):
+            logger.info("Public clone failed, trying with authentication...")
+            # Clean up first attempt
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            temp_dir = tempfile.mkdtemp()
+            
+            # Convert to authenticated URL
+            auth_repo_url = repo_url.replace("https://github.com/", f"https://x-access-token:{access_token}@github.com/")
+            cmd = f"git clone --branch {branch} --depth 1 {auth_repo_url} {temp_dir}"
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
         if result.returncode != 0:
             logger.error(f"Failed to clone repository: {result.stderr}")
+            logger.error(f"Git command output: {result.stdout}")
             shutil.rmtree(temp_dir, ignore_errors=True)
             return None
         
-        logger.info(f"Repository cloned to {temp_dir}")
+        logger.info(f"Repository cloned successfully to {temp_dir}")
         return temp_dir
     except Exception as e:
         logger.error(f"Error cloning repository: {e}")
