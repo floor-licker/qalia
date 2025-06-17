@@ -805,6 +805,9 @@ class SessionManager:
             # Prepare the analysis prompt
             prompt = self._create_analysis_prompt(exploration_results)
             
+            # Replace the XML placeholder with actual XML content
+            prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+            
             logger.info("🤖 Sending XML to ChatGPT for automated bug analysis...")
             
             # Send to ChatGPT
@@ -818,7 +821,7 @@ class SessionManager:
                     },
                     {
                         "role": "user",
-                        "content": f"{prompt}\n\nXML Report:\n{xml_content}"
+                        "content": prompt
                     }
                 ],
                 temperature=0.1,  # Low temperature for consistent analysis
@@ -872,7 +875,8 @@ class SessionManager:
             pages_visited=summary.get('pages_visited', 0),
             errors_found=summary.get('errors_found', 0),
             typos_found=summary.get('typos_found', 0),
-            confirmed_typos=summary.get('confirmed_typos', 0)
+            confirmed_typos=summary.get('confirmed_typos', 0),
+            xml_report="[XML_REPORT_PLACEHOLDER]"  # Will be replaced in analyze_with_chatgpt
         )
 
         return prompt

@@ -23,6 +23,10 @@ PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated and
 
 ANALYSIS REQUIREMENTS:
 
+0. **Brief Interpretation of the Application**: 
+   - Explain in 1 sentence what kind of application you interpret from the XML data.
+   - Give examples of actual valid usages of the site according to the XML data, i.e., "things" that a user can do.
+
 1. **User Journey Analysis from XML**: 
    - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions) by analyzing the sequence of states in the provided XML.
    - Map ALL critical paths through the application, referencing State IDs from the XML.
