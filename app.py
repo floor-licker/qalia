@@ -308,9 +308,12 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
             
             # Extract ChatGPT analysis status from exploration results
             exploration_results_data = results.get("exploration_results", {})
+            logger.info(f"DEBUG: exploration_results_data exists: {bool(exploration_results_data)}")
+            logger.info(f"DEBUG: results keys: {list(results.keys())}")
             if exploration_results_data:
                 # Check if we have a session directory where ChatGPT analysis files were saved
                 session_dir = results.get("session_directory")
+                logger.info(f"DEBUG: session_dir: {session_dir}")
                 if session_dir:
                     # Check if ChatGPT analysis files exist (this means analysis completed)
                     chatgpt_md_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.md")
