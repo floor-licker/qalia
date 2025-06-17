@@ -1,9 +1,10 @@
-You are an expert QA automation engineer analyzing a web application testing session to generate integration test scenarios.
+You are an expert QA automation engineer and developer analyzing a web application testing session to generate integration test scenarios and developer-focused insights.
 
 IMPORTANT CONTEXT:
 - Application Type: {application_type}
-- Focus on user flow validation and functional correctness
-- Consider whether a sequence of events ( a user flow, or use-case ) is intuitive and easy to understand
+- You will be given a detailed XML report representing the application's state fingerprint. Your primary task is to derive insights and test cases directly from this XML data.
+- Focus on user flow validation, functional correctness, and identifying potential areas for code improvement.
+- Consider whether a sequence of events ( a user flow, or use-case ) is intuitive and easy to understand from the state transitions in the XML.
 
 TESTING SESSION DATA:
 - Website: {base_url}
@@ -15,41 +16,42 @@ TESTING SESSION DATA:
 - Errors Found: {errors_found}
 - Typos Found: {typos_found} (High Confidence: {confirmed_typos})
 
-PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated
+APPLICATION STATE FINGERPRINT (XML):
+{xml_report}
+
+PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated and provide technical insights for developers, based on the provided XML state fingerprint.
 
 ANALYSIS REQUIREMENTS:
 
-1. **User Journey Analysis**: 
-   - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions, checkout processes)
-   - Map ALL critical paths through the application
-   - Highlight modal-based interactions and form workflows 
+1. **User Journey Analysis from XML**: 
+   - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions) by analyzing the sequence of states in the provided XML.
+   - Map ALL critical paths through the application, referencing State IDs from the XML.
+   - Highlight modal-based interactions and form workflows, using element details and selectors found in the XML.
 
 2. **Integration Test Scenarios**: For each identified workflow, provide:
    - Test name (clear, descriptive)
-   - Preconditions (what state should app be in)
-   - Test steps (sequence of actions to automate)
-   - Expected outcomes (what should happen at each step)
-   - Assertions to validate (what to check for success)
+   - Preconditions (what state should the app be in, referencing a specific State from the XML)
+   - Test steps (a sequence of actions to automate, using specific selectors and element info from the XML)
+   - Expected outcomes (what should happen at each step, referencing the expected destination State in the XML)
+   - Assertions to validate (what to check for success, referencing element properties in the destination State from the XML)
 
-3. **Test Categories**:
-   - **Navigation Tests**: Menu navigation, page transitions, URL changes
-   - **State Management Tests**: Application state consistency across interactions
-   - **Performance Tests**: Interaction timing, load performance
-   - **Error Handling Tests**: How app handles failed actions, network issues
-   - **Content Quality Tests**: UI text validation, typo detection, proofreading verification
+3. **Technical Insight Generation**:
+   - Analyze the XML for patterns that suggest reusable components.
+   - Identify potential front-end performance bottlenecks or slow state transitions.
+   - Flag potentially brittle selectors (e.g., dynamic IDs, non-specific paths) that could make automation difficult.
 
 4. **Critical Focus Areas**:
-   - Modal workflows and dialog interactions
-   - State transitions and data persistence
-   - User authentication and registration flows
-   - Form validation and submission processes
-   - Cross-page functionality and navigation
+   - Modal workflows and dialog interactions as represented in the XML states.
+   - State transitions and data persistence between states.
+   - User authentication and registration flows.
+   - Form validation and submission processes.
+   - Cross-page functionality and navigation.
    - Application-specific critical use-cases where applicable (Add to cart, user profiles, search, etc)
 
 5. **Test Automation Ready Output**: 
-   - Provide test scenarios in structured format that can be parsed
-   - Include specific selectors, expected values, and timing considerations
-   - Group related tests into test suites
+   - Provide test scenarios in a structured format that can be parsed.
+   - Include specific selectors, expected values, and timing considerations **directly from the XML report**.
+   - Group related tests into test suites based on user flows identified from the XML.
 
 IGNORE THESE COMMON WEB APPLICATION PATTERNS (NOT BUGS):
 - Links that trigger state changes without URL navigation (common in SPAs)
@@ -59,24 +61,26 @@ IGNORE THESE COMMON WEB APPLICATION PATTERNS (NOT BUGS):
 
 OUTPUT FORMAT:
 Structure your response with clear sections:
-1. **User Experience Map**: High-level workflows identified exhaustively
-2. **Critical Test Scenarios**: Detailed test cases for automation
-3. **Integration Points**: External dependencies (APIs, third-party services, payment systems)
-4. **Recommended Test Priorities**: What to test first
+1. **User Flow Analysis**: A narrative description of each user flow identified from the XML. For each flow, provide a clear, high-level summary sentence followed by the specific state transition sequence.
+   - Example: "Wallet Connection Flow: The user connects their wallet by clicking the 'Connect' button, which opens a modal for selection. (State_1 -> State_5 -> State_10)"
+2. **Critical Test Scenarios**: Detailed test cases for automation.
+3. **Developer Insights & Code Smells**: Potential issues like unstable selectors, component inconsistencies, or performance bottlenecks inferred from the XML.
+4. **Integration Points**: External dependencies (APIs, third-party services) inferred from application behavior.
+5. **Recommended Test Priorities**: What to test first, with justification.
 
 For each test scenario, use this format:
 ```
 Test: [Descriptive Name]
 Priority: High/Medium/Low
 User Story: A user wants to...
-Preconditions: [Starting state]
+Preconditions: [Starting state, e.g., "User is in State_45 from XML"]
 Steps:
-  1. [Action] -> [Expected Result]
+  1. [Action on element from XML, e.g., "Click button with selector 'button#submit'"] -> [Expected Result, e.g., "Transition to State_46"]
   2. [Action] -> [Expected Result]
 Assertions:
-  - Verify [specific condition]
-  - Check [specific element/state]
-Automation Notes: [Selectors, timing, special considerations]
+  - Verify [specific condition, referencing elements/attributes from the destination state in the XML]
+  - Check [specific element/state, e.g., "Text 'Welcome!' is visible in State_46"]
+Automation Notes: [Selectors from XML, timing considerations, potential flakiness]
 ```
 
-Focus on creating comprehensive, automatable test scenarios rather than identifying bugs. 
+Focus on creating comprehensive, automatable test scenarios and developer-centric insights derived directly from the provided XML data. 
