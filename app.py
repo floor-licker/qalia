@@ -314,6 +314,26 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 # Check if we have a session directory where ChatGPT analysis files were saved
                 session_dir = results.get("session_directory")
                 logger.info(f"DEBUG: session_dir: {session_dir}")
+                
+                # If session_dir is None, try to find it from other sources or discover it
+                if not session_dir:
+                    # Try alternative sources
+                    session_info = exploration_results_data.get('session_info', {})
+                    session_dir = session_info.get('session_dir')
+                    logger.info(f"DEBUG: Fallback session_dir from session_info: {session_dir}")
+                    
+                    # If still None, try to find the latest session directory
+                    if not session_dir:
+                        import glob
+                        session_pattern = "exploration_sessions/localhost_*_*/reports"
+                        session_dirs = glob.glob(session_pattern)
+                        if session_dirs:
+                            # Get the most recent session directory
+                            session_dirs.sort(reverse=True)
+                            latest_session = session_dirs[0].replace('/reports', '')
+                            session_dir = latest_session
+                            logger.info(f"DEBUG: Found latest session directory: {session_dir}")
+                
                 if session_dir:
                     # Check if ChatGPT analysis files exist (this means analysis completed)
                     chatgpt_md_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.md")
