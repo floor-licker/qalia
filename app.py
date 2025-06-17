@@ -317,11 +317,22 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                     chatgpt_json_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.json")
                     
                     if os.path.exists(chatgpt_md_path) and os.path.exists(chatgpt_json_path):
-                        analysis_summary["chatgpt_analysis"] = {
-                            "status": "completed",
-                            "error": None
-                        }
-                        logger.info("ChatGPT analysis files found - marking as completed")
+                        # Read the actual ChatGPT analysis content
+                        try:
+                            with open(chatgpt_md_path, 'r', encoding='utf-8') as f:
+                                chatgpt_content = f.read()
+                            analysis_summary["chatgpt_analysis"] = {
+                                "status": "completed",
+                                "content": chatgpt_content,
+                                "error": None
+                            }
+                            logger.info("ChatGPT analysis files found and content loaded successfully")
+                        except Exception as e:
+                            logger.error(f"Failed to read ChatGPT analysis file: {e}")
+                            analysis_summary["chatgpt_analysis"] = {
+                                "status": "failed",
+                                "error": f"Could not read analysis file: {e}"
+                            }
                     else:
                         # Files don't exist, check if there was an error
                         try:
@@ -460,7 +471,16 @@ The generated tests are available in the workflow artifacts. You can download an
 
         # Add ChatGPT analysis status information
         if chatgpt_status == "completed":
-            comment += """
+            # Include the actual ChatGPT analysis content
+            chatgpt_content = analysis_results.get("chatgpt_analysis", {}).get("content", "")
+            if chatgpt_content:
+                comment += f"""
+
+### 🧠 AI Analysis
+{chatgpt_content}
+"""
+            else:
+                comment += """
 
 ### 🧠 AI Analysis
 ✅ **Detailed ChatGPT analysis completed** - comprehensive insights and test scenarios generated
