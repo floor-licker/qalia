@@ -98,5 +98,3 @@ secrets.env
 
 # Secrets
 .github/secrets.env 
-
-/demo-web-app/
