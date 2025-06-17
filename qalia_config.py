@@ -44,8 +44,8 @@ class QaliaConfig:
         """Return default configuration when no qalia.yml is found."""
         return {
             "deployment": {
-                "type": "static",
-                "url": None
+                "startup": "python -m http.server {port}",
+                "port": 8080
             },
             "testing": {
                 "entry_points": [{"url": "/", "name": "Homepage"}],
@@ -98,7 +98,6 @@ class DeploymentManager:
     
     async def deploy_application(self) -> str:
         """Deploy the application and return the URL where it's accessible."""
-        deployment_type = self.deployment_config.get("type", "static")
         
         # If URL is provided, use it directly (existing deployment)
         if "url" in self.deployment_config:
@@ -106,23 +105,12 @@ class DeploymentManager:
             logger.info(f"Using existing deployment at {url}")
             return url
         
-        # Otherwise, deploy locally based on type
-        if deployment_type == "static":
-            return await self._deploy_static()
-        elif deployment_type == "npm":
-            return await self._deploy_npm()
-        elif deployment_type == "python":
-            return await self._deploy_python()
-        elif deployment_type == "docker":
-            return await self._deploy_docker()
-        elif deployment_type == "custom":
-            return await self._deploy_custom()
-        else:
-            raise ValueError(f"Unsupported deployment type: {deployment_type}")
-    
-    async def _deploy_static(self) -> str:
-        """Deploy a static website."""
-        # For static sites, we can serve them directly
+        # Check if startup command is provided
+        startup_command = self.deployment_config.get("startup")
+        if not startup_command:
+            raise ValueError("No startup command specified. Please add 'startup' field to deployment configuration.")
+        
+        # Get port (default to 8080)
         port = self.deployment_config.get("port", 8080)
         
         # Try to find an available port if the default is taken
@@ -131,13 +119,13 @@ class DeploymentManager:
         # Run build commands if specified
         await self._run_build_commands()
         
-        # Start a simple HTTP server
-        build_dir = self.deployment_config.get("build_dir", "dist")
-        if not os.path.exists(build_dir):
-            build_dir = "."
+        # Replace {port} placeholder in startup command if present
+        startup_command = startup_command.replace("{port}", str(port))
         
-        cmd = f"python -m http.server {port} --directory {build_dir}"
-        self.process = subprocess.Popen(cmd, shell=True, cwd=self.repo_path)
+        logger.info(f"Starting application with command: {startup_command}")
+        
+        # Start the application
+        self.process = subprocess.Popen(startup_command, shell=True, cwd=self.repo_path)
         
         # Wait for server to be ready
         url = f"http://localhost:{port}"
@@ -157,103 +145,6 @@ class DeploymentManager:
         
         # If no port found in range, raise error
         raise RuntimeError(f"No available ports found in range {preferred_port}-{preferred_port + 100}")
-    
-    async def _deploy_npm(self) -> str:
-        """Deploy a Node.js application."""
-        # Run build commands
-        await self._run_build_commands()
-        
-        # Start the application
-        start_config = self.deployment_config.get("start", {})
-        command = start_config.get("command", "npm start")
-        port = start_config.get("port", 3000)
-        
-        # Try to find an available port if the default is taken
-        port = self._find_available_port(port)
-        
-        # Set environment variables
-        env = os.environ.copy()
-        env_vars = self.config.config.get("environment", {}).get("variables", {})
-        env.update(env_vars)
-        
-        self.process = subprocess.Popen(
-            command, 
-            shell=True, 
-            cwd=self.repo_path,
-            env=env
-        )
-        
-        # Wait for application to be ready
-        url = f"http://localhost:{port}"
-        await self._wait_for_ready(url, start_config.get("wait_for_ready", 30))
-        return url
-    
-    async def _deploy_python(self) -> str:
-        """Deploy a Python application."""
-        # Install dependencies
-        if os.path.exists(os.path.join(self.repo_path, "requirements.txt")):
-            subprocess.run(["pip", "install", "-r", "requirements.txt"], cwd=self.repo_path)
-        
-        # Run build commands
-        await self._run_build_commands()
-        
-        # Start the application
-        start_config = self.deployment_config.get("start", {})
-        command = start_config.get("command", "python app.py")
-        port = start_config.get("port", 5000)
-        
-        # Try to find an available port if the default is taken
-        port = self._find_available_port(port)
-        
-        self.process = subprocess.Popen(command, shell=True, cwd=self.repo_path)
-        
-        url = f"http://localhost:{port}"
-        await self._wait_for_ready(url, start_config.get("wait_for_ready", 30))
-        return url
-    
-    async def _deploy_docker(self) -> str:
-        """Deploy using Docker."""
-        docker_config = self.deployment_config.get("docker", {})
-        image_name = docker_config.get("image", "qalia-test-app")
-        port = docker_config.get("port", 3000)
-        
-        # Try to find an available port if the default is taken
-        port = self._find_available_port(port)
-        
-        # Build Docker image
-        build_cmd = f"docker build -t {image_name} ."
-        subprocess.run(build_cmd, shell=True, cwd=self.repo_path, check=True)
-        
-        # Run container
-        run_cmd = f"docker run -d -p {port}:{port} {image_name}"
-        result = subprocess.run(run_cmd, shell=True, capture_output=True, text=True)
-        container_id = result.stdout.strip()
-        
-        # Store container ID for cleanup
-        self.container_id = container_id
-        
-        url = f"http://localhost:{port}"
-        await self._wait_for_ready(url)
-        return url
-    
-    async def _deploy_custom(self) -> str:
-        """Deploy using custom commands."""
-        custom_config = self.deployment_config.get("custom", {})
-        
-        # Run setup commands
-        setup_commands = custom_config.get("setup", [])
-        for cmd in setup_commands:
-            subprocess.run(cmd, shell=True, cwd=self.repo_path, check=True)
-        
-        # Start the application
-        start_command = custom_config.get("start_command")
-        if start_command:
-            self.process = subprocess.Popen(start_command, shell=True, cwd=self.repo_path)
-        
-        # Return the URL
-        url = custom_config.get("url", "http://localhost:3000")
-        await self._wait_for_ready(url)
-        return url
     
     async def _run_build_commands(self):
         """Run build commands specified in configuration."""
@@ -287,10 +178,6 @@ class DeploymentManager:
         if self.process:
             self.process.terminate()
             self.process.wait()
-        
-        if hasattr(self, 'container_id'):
-            subprocess.run(f"docker stop {self.container_id}", shell=True)
-            subprocess.run(f"docker rm {self.container_id}", shell=True)
         
         if self.temp_dir:
             shutil.rmtree(self.temp_dir, ignore_errors=True)
