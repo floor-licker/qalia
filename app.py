@@ -634,15 +634,15 @@ async def handle_pull_request(payload: Dict[str, Any]):
             repo = g.get_repo(repo_name)
             pr = repo.get_pull(pr_number)
             pr.create_issue_comment("""
-## 🚀 Qalia.ai Analysis Started
+## UI Analysis Started
 
 I'm now analyzing your application! This process typically takes 2-10 minutes.
 
 **What I'm doing:**
-- 🔍 Exploring your application with AI-powered browser automation
-- 🧪 Testing interactive elements and user flows
-- 🐛 Identifying potential bugs and issues
-- 📝 Generating comprehensive test cases
+- Exploring your application with AI-powered browser automation
+- Testing interactive elements and user flows until I have an exhaustive fingerprint of your application.
+- Identifying potential bugs and issues per user flow
+- Generating comprehensive test cases
 
 I'll update this comment with detailed results when the analysis is complete.
 
