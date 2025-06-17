@@ -1,0 +1,82 @@
+You are an expert QA automation engineer analyzing a web application testing session to generate integration test scenarios.
+
+IMPORTANT CONTEXT:
+- Application Type: {application_type}
+- Focus on user flow validation and functional correctness
+- Consider whether a sequence of events ( a user flow, or use-case ) is intuitive and easy to understand
+
+TESTING SESSION DATA:
+- Website: {base_url}
+- Application Type: {application_type}
+- Total Actions: {total_actions}
+- Success Rate: {success_rate}
+- Duration: {duration} seconds
+- Pages Visited: {pages_visited}
+- Errors Found: {errors_found}
+- Typos Found: {typos_found} (High Confidence: {confirmed_typos})
+
+PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated
+
+ANALYSIS REQUIREMENTS:
+
+1. **User Journey Analysis**: 
+   - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions, checkout processes)
+   - Map ALL critical paths through the application
+   - Highlight modal-based interactions and form workflows 
+
+2. **Integration Test Scenarios**: For each identified workflow, provide:
+   - Test name (clear, descriptive)
+   - Preconditions (what state should app be in)
+   - Test steps (sequence of actions to automate)
+   - Expected outcomes (what should happen at each step)
+   - Assertions to validate (what to check for success)
+
+3. **Test Categories**:
+   - **Navigation Tests**: Menu navigation, page transitions, URL changes
+   - **State Management Tests**: Application state consistency across interactions
+   - **Performance Tests**: Interaction timing, load performance
+   - **Error Handling Tests**: How app handles failed actions, network issues
+   - **Content Quality Tests**: UI text validation, typo detection, proofreading verification
+
+4. **Critical Focus Areas**:
+   - Modal workflows and dialog interactions
+   - State transitions and data persistence
+   - User authentication and registration flows
+   - Form validation and submission processes
+   - Cross-page functionality and navigation
+   - Application-specific critical use-cases where applicable (Add to cart, user profiles, search, etc)
+
+5. **Test Automation Ready Output**: 
+   - Provide test scenarios in structured format that can be parsed
+   - Include specific selectors, expected values, and timing considerations
+   - Group related tests into test suites
+
+IGNORE THESE COMMON WEB APPLICATION PATTERNS (NOT BUGS):
+- Links that trigger state changes without URL navigation (common in SPAs)
+- JavaScript-driven content updates and dynamic loading
+- Modal overlays and dialog interactions
+- Asynchronous form submissions without page refresh
+
+OUTPUT FORMAT:
+Structure your response with clear sections:
+1. **User Experience Map**: High-level workflows identified exhaustively
+2. **Critical Test Scenarios**: Detailed test cases for automation
+3. **Integration Points**: External dependencies (APIs, third-party services, payment systems)
+4. **Recommended Test Priorities**: What to test first
+
+For each test scenario, use this format:
+```
+Test: [Descriptive Name]
+Priority: High/Medium/Low
+User Story: A user wants to...
+Preconditions: [Starting state]
+Steps:
+  1. [Action] -> [Expected Result]
+  2. [Action] -> [Expected Result]
+Assertions:
+  - Verify [specific condition]
+  - Check [specific element/state]
+Automation Notes: [Selectors, timing, special considerations]
+```
+
+Focus on creating comprehensive, automatable test scenarios rather than identifying bugs. 

@@ -808,12 +808,13 @@ class SessionManager:
             logger.info("🤖 Sending XML to ChatGPT for automated bug analysis...")
             
             # Send to ChatGPT
+            system_prompt = self._load_system_prompt()
             response = await client.chat.completions.create(
                 model="gpt-4o",  # Use the latest model
                 messages=[
                     {
                         "role": "system", 
-                        "content": "You are an expert QA automation engineer specializing in integration test generation for web applications. Your primary goal is to analyze automated testing sessions and generate comprehensive, automatable test scenarios. Focus on user journey mapping, modal interactions, form workflows, navigation patterns, and creating structured test cases that can be easily converted into automated tests using frameworks like Playwright or Selenium. Provide actionable test scenarios with specific selectors, assertions, and timing requirements."
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
@@ -848,90 +849,83 @@ class SessionManager:
         
         summary = exploration_results.get('exploration_summary', {})
         
-        prompt = f"""You are an expert QA automation engineer analyzing a web application testing session to generate integration test scenarios.
-
-IMPORTANT CONTEXT:
-- Application Type: {self._get_application_description(self._detect_application_type(exploration_results.get('detailed_results', {}).get('executed_actions', [])))}
-- Focus on user flow validation and functional correctness
-- Consider whether a sequence of events ( a user flow, or use-case ) is intuitive and easy to understand
-
-TESTING SESSION DATA:
-- Website: {self.base_url}
-- Application Type: {self._get_application_description(self._detect_application_type(exploration_results.get('detailed_results', {}).get('executed_actions', [])))}
-- Total Actions: {summary.get('total_actions_performed', 0)}
-- Success Rate: {summary.get('success_rate', 0):.1%}
-- Duration: {summary.get('duration', 0):.1f} seconds
-- Pages Visited: {summary.get('pages_visited', 0)}
-- Errors Found: {summary.get('errors_found', 0)}
-- Typos Found: {summary.get('typos_found', 0)} (High Confidence: {summary.get('confirmed_typos', 0)})
-
-PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated
-
-ANALYSIS REQUIREMENTS:
-
-1. **User Journey Analysis**: 
-   - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions, checkout processes)
-   - Map ALL critical paths through the application
-   - Highlight modal-based interactions and form workflows 
-
-2. **Integration Test Scenarios**: For each identified workflow, provide:
-   - Test name (clear, descriptive)
-   - Preconditions (what state should app be in)
-   - Test steps (sequence of actions to automate)
-   - Expected outcomes (what should happen at each step)
-   - Assertions to validate (what to check for success)
-
-3. **Test Categories**:
-   - **Navigation Tests**: Menu navigation, page transitions, URL changes
-   - **State Management Tests**: Application state consistency across interactions
-   - **Performance Tests**: Interaction timing, load performance
-   - **Error Handling Tests**: How app handles failed actions, network issues
-   - **Content Quality Tests**: UI text validation, typo detection, proofreading verification
-
-4. **Critical Focus Areas**:
-   - Modal workflows and dialog interactions
-   - State transitions and data persistence
-   - User authentication and registration flows
-   - Form validation and submission processes
-   - Cross-page functionality and navigation
-   - Application-specific critical use-cases where applicable (Add to cart, user profiles, search, etc)
-
-5. **Test Automation Ready Output**: 
-   - Provide test scenarios in structured format that can be parsed
-   - Include specific selectors, expected values, and timing considerations
-   - Group related tests into test suites
-
-IGNORE THESE COMMON WEB APPLICATION PATTERNS (NOT BUGS):
-- Links that trigger state changes without URL navigation (common in SPAs)
-- JavaScript-driven content updates and dynamic loading
-- Modal overlays and dialog interactions
-- Asynchronous form submissions without page refresh
-
-OUTPUT FORMAT:
-Structure your response with clear sections:
-1. **User Experience Map**: High-level workflows identified exhaustively
-2. **Critical Test Scenarios**: Detailed test cases for automation
-3. **Integration Points**: External dependencies (APIs, third-party services, payment systems)
-4. **Recommended Test Priorities**: What to test first
-
-For each test scenario, use this format:
-```
-Test: [Descriptive Name]
-Priority: High/Medium/Low
-User Story: A user wants to...
-Preconditions: [Starting state]
-Steps:
-  1. [Action] -> [Expected Result]
-  2. [Action] -> [Expected Result]
-Assertions:
-  - Verify [specific condition]
-  - Check [specific element/state]
-Automation Notes: [Selectors, timing, special considerations]
-```
-
-Focus on creating comprehensive, automatable test scenarios rather than identifying bugs."""
+        # Load prompt template from file
+        prompt_template = self._load_prompt_template()
+        
+        # Get application type for context
+        action_history = exploration_results.get('detailed_results', {}).get('executed_actions', [])
+        if not action_history:
+            action_history = exploration_results.get('action_history', [])
+            if not action_history:
+                action_history = exploration_results.get('actions_performed', [])
+        
+        app_type = self._detect_application_type(action_history)
+        app_description = self._get_application_description(app_type)
+        
+        # Format the prompt with actual values
+        prompt = prompt_template.format(
+            application_type=app_description,
+            base_url=self.base_url,
+            total_actions=summary.get('total_actions_performed', 0),
+            success_rate=f"{summary.get('success_rate', 0):.1%}",
+            duration=f"{summary.get('duration', 0):.1f}",
+            pages_visited=summary.get('pages_visited', 0),
+            errors_found=summary.get('errors_found', 0),
+            typos_found=summary.get('typos_found', 0),
+            confirmed_typos=summary.get('confirmed_typos', 0)
+        )
 
         return prompt
+    
+    def _load_prompt_template(self) -> str:
+        """Load the ChatGPT analysis prompt template from file."""
+        prompt_file = Path("prompts/chatgpt_analysis_prompt.txt")
+        
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.warning(f"⚠️ Prompt template not found at {prompt_file}, using fallback")
+            return self._get_fallback_prompt()
+        except Exception as e:
+            logger.error(f"❌ Error loading prompt template: {e}")
+            return self._get_fallback_prompt()
+    
+    def _get_fallback_prompt(self) -> str:
+        """Fallback prompt if template file is not available."""
+        return """You are an expert QA automation engineer analyzing a web application testing session.
+
+TESTING SESSION DATA:
+- Website: {base_url}
+- Application Type: {application_type}
+- Total Actions: {total_actions}
+- Success Rate: {success_rate}
+- Duration: {duration} seconds
+- Pages Visited: {pages_visited}
+- Errors Found: {errors_found}
+- Typos Found: {typos_found} (High Confidence: {confirmed_typos})
+
+Please analyze this testing session and provide integration test scenarios that can be automated.
+Focus on user journeys, modal interactions, form workflows, and navigation patterns.
+Provide actionable test scenarios with specific selectors, assertions, and timing requirements."""
+    
+    def _load_system_prompt(self) -> str:
+        """Load the ChatGPT system prompt from file."""
+        system_prompt_file = Path("prompts/chatgpt_system_prompt.txt")
+        
+        try:
+            with open(system_prompt_file, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            logger.warning(f"⚠️ System prompt not found at {system_prompt_file}, using fallback")
+            return self._get_fallback_system_prompt()
+        except Exception as e:
+            logger.error(f"❌ Error loading system prompt: {e}")
+            return self._get_fallback_system_prompt()
+    
+    def _get_fallback_system_prompt(self) -> str:
+        """Fallback system prompt if template file is not available."""
+        return "You are an expert QA automation engineer specializing in integration test generation for web applications. Your primary goal is to analyze automated testing sessions and generate comprehensive, automatable test scenarios. Focus on user journey mapping, modal interactions, form workflows, navigation patterns, and creating structured test cases that can be easily converted into automated tests using frameworks like Playwright or Selenium. Provide actionable test scenarios with specific selectors, assertions, and timing requirements."
     
     async def _save_chatgpt_analysis(self, chatgpt_response: str, exploration_results: Dict[str, Any]) -> list[str]:
         """Save ChatGPT analysis in multiple formats."""
