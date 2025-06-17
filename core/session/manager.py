@@ -853,7 +853,7 @@ Focus on creating comprehensive, automatable test scenarios rather than identify
         # 1. Save raw ChatGPT response
         raw_file = self.session_dir / "reports" / "chatgpt_raw_response.txt"
         with open(raw_file, 'w', encoding='utf-8') as f:
-            f.write(f"ChatGPT Bug Analysis Report\n")
+            f.write(f"Bug Analysis Report\n")
             f.write(f"Generated: {timestamp}\n")
             f.write(f"Session: {self.session_id}\n")
             f.write(f"Website: {self.base_url}\n")
@@ -922,7 +922,7 @@ Focus on creating comprehensive, automatable test scenarios rather than identify
         summary = structured_data.get("session_summary", {})
         flags = structured_data.get("automated_flags", {})
         
-        markdown = f"""# 🤖 ChatGPT Bug Analysis Report
+        markdown = f"""# Bug Analysis Report
 
 ## 📊 Session Overview
 - **Website**: {metadata['website']}
