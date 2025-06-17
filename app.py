@@ -316,6 +316,12 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                     chatgpt_md_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.md")
                     chatgpt_json_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.json")
                     
+                    logger.info(f"DEBUG: Looking for ChatGPT files at:")
+                    logger.info(f"DEBUG: MD path: {chatgpt_md_path}")
+                    logger.info(f"DEBUG: JSON path: {chatgpt_json_path}")
+                    logger.info(f"DEBUG: MD exists: {os.path.exists(chatgpt_md_path)}")
+                    logger.info(f"DEBUG: JSON exists: {os.path.exists(chatgpt_json_path)}")
+                    
                     if os.path.exists(chatgpt_md_path) and os.path.exists(chatgpt_json_path):
                         # Read the actual ChatGPT analysis content
                         try:
@@ -448,6 +454,9 @@ async def comment_on_pr(g: Github, repo_name: str, pr_number: int, analysis_resu
         # Check ChatGPT analysis status for detailed reporting
         chatgpt_status = analysis_results.get("chatgpt_analysis", {}).get("status", "unknown")
         chatgpt_error = analysis_results.get("chatgpt_analysis", {}).get("error", None)
+        
+        logger.info(f"DEBUG: PR Comment - ChatGPT status: {chatgpt_status}")
+        logger.info(f"DEBUG: PR Comment - ChatGPT analysis keys: {list(analysis_results.get('chatgpt_analysis', {}).keys())}")
         
         # Build the comment with ChatGPT status information
         comment = f"""
