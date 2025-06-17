@@ -127,83 +127,7 @@ def get_github_client(installation_id: int) -> tuple[Github, str]:
     # Return client with installation token and the token itself
     return Github(access_token), access_token
 
-async def run_simplified_static_testing(app_url: str, repo_path: str) -> Dict[str, Any]:
-    """Run simplified testing for static sites without browsers."""
-    logger.info(f"Running simplified testing for static site: {app_url}")
-    
-    try:
-        # Basic HTTP connectivity test
-        response = requests.get(app_url, timeout=30)
-        status_code = response.status_code
-        
-        # Analyze HTML content
-        html_content = response.text
-        
-        # Basic analysis
-        has_title = '<title>' in html_content.lower()
-        has_meta = '<meta' in html_content.lower()
-        has_css = 'css' in html_content.lower() or '<style' in html_content.lower()
-        has_js = 'javascript' in html_content.lower() or '<script' in html_content.lower()
-        
-        # Count basic elements
-        form_count = html_content.lower().count('<form')
-        link_count = html_content.lower().count('<a ')
-        image_count = html_content.lower().count('<img')
-        
-        # Generate basic test cases
-        test_cases = []
-        
-        if status_code == 200:
-            test_cases.append("✅ HTTP connectivity test")
-            test_cases.append("✅ Page loads successfully")
-        
-        if has_title:
-            test_cases.append("✅ Page has title element")
-        
-        if has_meta:
-            test_cases.append("✅ Page has meta tags")
-            
-        if has_css:
-            test_cases.append("✅ Page includes CSS styling")
-            
-        if has_js:
-            test_cases.append("✅ Page includes JavaScript")
-            
-        if form_count > 0:
-            test_cases.append(f"✅ Found {form_count} form(s) for interaction testing")
-            
-        if link_count > 0:
-            test_cases.append(f"✅ Found {link_count} link(s) for navigation testing")
-            
-        if image_count > 0:
-            test_cases.append(f"✅ Found {image_count} image(s) for visual testing")
-        
-        # Create results structure
-        results = {
-            "exploration_results": {
-                "exploration_summary": {
-                    "pages_visited": 1,
-                    "total_actions_performed": len(test_cases),
-                    "errors_found": 0 if status_code == 200 else 1,
-                    "states_discovered": 1
-                }
-            },
-            "test_generation_results": {
-                "summary": {
-                    "generation_summary": {
-                        "total_test_cases": len(test_cases)
-                    }
-                }
-            },
-            "session_directory": "simplified-testing"
-        }
-        
-        logger.info(f"Simplified testing completed: {len(test_cases)} test cases generated")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Simplified testing failed: {e}")
-        raise
+
 
 async def clone_repository(repo_url: str, branch: str = "main", access_token: str = None) -> str:
     """Clone repository to a temporary directory and return the path."""
@@ -351,22 +275,12 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                     "output_dir": temp_dir
                 }
             
-            # Try browser-based testing first, fall back to simplified testing
-            try:
-                results = await run_complete_pipeline(
-                    app_url, 
-                    exploration_options, 
-                    generation_options
-                )
-            except Exception as browser_error:
-                logger.warning(f"Browser-based testing failed: {browser_error}")
-                
-                # Fallback to simplified testing for static sites
-                if config and config.get_deployment_config().get('type') == 'static':
-                    logger.info("Falling back to simplified static site testing...")
-                    results = await run_simplified_static_testing(app_url, repo_path)
-                else:
-                    raise browser_error
+            # Run browser-based testing - FAIL if it doesn't work (no fallbacks!)
+            results = await run_complete_pipeline(
+                app_url, 
+                exploration_options, 
+                generation_options
+            )
             
             # Process results
             analysis_summary = {
