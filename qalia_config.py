@@ -99,16 +99,18 @@ class DeploymentManager:
     async def deploy_application(self) -> str:
         """Deploy the application and return the URL where it's accessible."""
         
-        # If URL is provided, use it directly (existing deployment)
-        if "url" in self.deployment_config:
+        # Check if startup command is provided - prefer local deployment
+        startup_command = self.deployment_config.get("startup")
+        if startup_command:
+            # Local deployment using startup command
+            logger.info("Found startup command - deploying locally")
+        elif "url" in self.deployment_config:
+            # Fallback to existing deployment URL
             url = self.deployment_config["url"]
             logger.info(f"Using existing deployment at {url}")
             return url
-        
-        # Check if startup command is provided
-        startup_command = self.deployment_config.get("startup")
-        if not startup_command:
-            raise ValueError("No startup command specified. Please add 'startup' field to deployment configuration.")
+        else:
+            raise ValueError("No startup command or URL specified. Please add 'startup' field to deployment configuration.")
         
         # Get port (default to 8080)
         port = self.deployment_config.get("port", 8080)
