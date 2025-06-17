@@ -301,16 +301,19 @@ class SessionManager:
             if not action_history:
                 action_history = exploration_results.get('actions_performed', [])
         
+        # Determine application type dynamically
+        app_type = self._detect_application_type(action_history)
+        
         root = Element("IntegrationTestAnalysis")
         root.set("domain", self.base_url)
         root.set("session_id", self.session_id)
         root.set("timestamp", str(time.time()))
         root.set("total_actions", str(len(action_history)))
-        root.set("application_type", "SPA_DeFi")  # Help ChatGPT understand context
+        root.set("application_type", app_type)
         
         # Enhanced Session Summary with test context
         summary = SubElement(root, "SessionSummary")
-        SubElement(summary, "ApplicationType").text = "Single Page Application (DeFi)"
+        SubElement(summary, "ApplicationType").text = self._get_application_description(app_type)
         SubElement(summary, "TotalActions").text = str(len(action_history))
         SubElement(summary, "SuccessfulActions").text = str(sum(1 for action in action_history if action.get('success', False)))
         SubElement(summary, "FailedActions").text = str(sum(1 for action in action_history if not action.get('success', True)))
@@ -335,7 +338,7 @@ class SessionManager:
                     action_ref.set("sequence", str(action.get('sequence', 0)))
                     action_ref.text = f"{action.get('action', {}).get('action', '')} on {action.get('action', {}).get('text', '')}"
         
-        # Modal Interactions - Highlight these for DeFi test generation
+        # Modal Interactions - Generic modal detection for any application
         modal_actions = [action for action in action_history if self._is_modal_action(action)]
         if modal_actions:
             modal_section = SubElement(root, "ModalInteractions")
@@ -395,15 +398,13 @@ class SessionManager:
             expected = SubElement(action_elem, "ExpectedBehavior")
             element_type = action_data.get('element_type', '')
             action_type = action_data.get('action', '')
+            element_text = action_data.get('text', '')
             
             if action_type == 'click':
                 if element_type == 'link':
-                    expected_text = "SPA navigation or state change (no full page reload expected)"
+                    expected_text = "Navigation or state change (may be SPA navigation without page reload)"
                 elif element_type == 'button':
-                    if 'CONNECT' in action_data.get('text', '').upper():
-                        expected_text = "Wallet connection modal should appear with wallet options"
-                    else:
-                        expected_text = "Button action should trigger state change or modal"
+                    expected_text = self._get_button_expected_behavior(element_text)
                 else:
                     expected_text = "Interactive response or state change"
             elif action_type == 'input':
@@ -491,23 +492,33 @@ class SessionManager:
                     elem.set("typo_count", str(count))
                     elem.text = f"{element_type} elements contain {count} typos"
         
-        # Test Suite Recommendations
+        # Test Suite Recommendations - Dynamic based on detected interactions
         test_suites = SubElement(root, "RecommendedTestSuites")
         
-        # Wallet Connection Test Suite
-        wallet_suite = SubElement(test_suites, "TestSuite")
-        wallet_suite.set("name", "WalletConnectionTests")
-        wallet_suite.set("priority", "High")
-        SubElement(wallet_suite, "Description").text = "Tests for DeFi wallet connection workflows"
-        SubElement(wallet_suite, "TestCount").text = str(len(modal_actions))
+        # Modal Interaction Test Suite (if modals detected)
+        if modal_actions:
+            modal_suite = SubElement(test_suites, "TestSuite")
+            modal_suite.set("name", "ModalInteractionTests")
+            modal_suite.set("priority", "High")
+            SubElement(modal_suite, "Description").text = "Tests for modal dialog interactions and workflows"
+            SubElement(modal_suite, "TestCount").text = str(len(modal_actions))
         
         # Navigation Test Suite  
         nav_suite = SubElement(test_suites, "TestSuite")
         nav_suite.set("name", "NavigationTests")
         nav_suite.set("priority", "Medium")
-        SubElement(nav_suite, "Description").text = "Tests for SPA navigation and state management"
+        SubElement(nav_suite, "Description").text = "Tests for application navigation and state management"
         nav_actions = [a for a in action_history if a.get('action', {}).get('element_type') == 'link']
         SubElement(nav_suite, "TestCount").text = str(len(nav_actions))
+        
+        # Form Interaction Test Suite (if forms detected)
+        form_actions = [a for a in action_history if a.get('action', {}).get('element_type') == 'input']
+        if form_actions:
+            form_suite = SubElement(test_suites, "TestSuite")
+            form_suite.set("name", "FormInteractionTests")
+            form_suite.set("priority", "High")
+            SubElement(form_suite, "Description").text = "Tests for form inputs and data validation"
+            SubElement(form_suite, "TestCount").text = str(len(form_actions))
         
         # Performance Test Suite
         perf_suite = SubElement(test_suites, "TestSuite")
@@ -531,6 +542,67 @@ class SessionManager:
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")
     
+    def _detect_application_type(self, action_history: list) -> str:
+        """Dynamically detect application type based on actions performed."""
+        if not action_history:
+            return "WebApplication"
+        
+        # Count different types of interactions
+        modal_actions = sum(1 for action in action_history if self._is_modal_action(action))
+        form_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'input')
+        button_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'button')
+        link_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'link')
+        
+        # Look for specific patterns in text content
+        all_text = ' '.join([action.get('action', {}).get('text', '') for action in action_history]).lower()
+        
+        # Detect application characteristics
+        if 'wallet' in all_text or 'connect' in all_text and 'crypto' in all_text:
+            return "DeFi_Application"
+        elif 'cart' in all_text or 'checkout' in all_text or 'purchase' in all_text:
+            return "ECommerce_Application"
+        elif 'login' in all_text or 'register' in all_text or 'profile' in all_text:
+            return "UserAccount_Application"
+        elif modal_actions > len(action_history) * 0.3:  # >30% modal interactions
+            return "Modal_Heavy_SPA"
+        elif form_actions > len(action_history) * 0.4:  # >40% form interactions
+            return "Form_Heavy_Application"
+        elif link_actions < len(action_history) * 0.1:  # <10% traditional links
+            return "Single_Page_Application"
+        else:
+            return "Traditional_WebApplication"
+    
+    def _get_application_description(self, app_type: str) -> str:
+        """Get human-readable description for application type."""
+        descriptions = {
+            "DeFi_Application": "Decentralized Finance Application",
+            "ECommerce_Application": "E-Commerce Application",
+            "UserAccount_Application": "User Account Management Application",
+            "Modal_Heavy_SPA": "Modal-Heavy Single Page Application",
+            "Form_Heavy_Application": "Form-Heavy Application",
+            "Single_Page_Application": "Single Page Application",
+            "Traditional_WebApplication": "Traditional Multi-Page Web Application",
+            "WebApplication": "Generic Web Application"
+        }
+        return descriptions.get(app_type, "Web Application")
+    
+    def _get_button_expected_behavior(self, element_text: str) -> str:
+        """Get expected behavior for button based on its text content."""
+        text_upper = element_text.upper()
+        
+        if any(word in text_upper for word in ['CONNECT', 'LOGIN', 'SIGN IN']):
+            return "Authentication modal or login process should trigger"
+        elif any(word in text_upper for word in ['SUBMIT', 'SAVE', 'SEND']):
+            return "Form submission or data processing should occur"
+        elif any(word in text_upper for word in ['ADD', 'CREATE', 'NEW']):
+            return "Item creation or addition workflow should start"
+        elif any(word in text_upper for word in ['DELETE', 'REMOVE', 'CANCEL']):
+            return "Confirmation dialog or removal action should occur"
+        elif any(word in text_upper for word in ['CLOSE', 'DISMISS']):
+            return "Modal or overlay should close"
+        else:
+            return "Button action should trigger appropriate response"
+    
     def _extract_user_journeys(self, action_history: list) -> dict:
         """Extract logical user journeys from action sequence."""
         journeys = {}
@@ -540,17 +612,23 @@ class SessionManager:
         for action in action_history:
             action_text = action.get('action', {}).get('text', '').upper()
             
-            # Start new journey on significant navigation
-            if any(keyword in action_text for keyword in ['CONNECT', 'HOME', 'PROFILE']):
+            # Start new journey on significant navigation or interaction patterns
+            if any(keyword in action_text for keyword in ['HOME', 'PROFILE', 'LOGIN', 'REGISTER', 'CHECKOUT', 'CART']):
                 if current_journey:
                     journeys[journey_name] = current_journey
                 
-                if 'CONNECT' in action_text:
-                    journey_name = "Wallet_Connection_Flow"
-                elif 'HOME' in action_text:
+                if 'HOME' in action_text:
                     journey_name = "Home_Navigation"
+                elif any(word in action_text for word in ['LOGIN', 'SIGN IN']):
+                    journey_name = "Authentication_Flow"
                 elif 'PROFILE' in action_text:
                     journey_name = "Profile_Management"
+                elif 'REGISTER' in action_text or 'SIGN UP' in action_text:
+                    journey_name = "Registration_Flow"
+                elif 'CHECKOUT' in action_text:
+                    journey_name = "Checkout_Flow"
+                elif 'CART' in action_text:
+                    journey_name = "Shopping_Cart_Flow"
                 else:
                     journey_name = f"Journey_{len(journeys) + 1}"
                 
@@ -567,9 +645,12 @@ class SessionManager:
     def _get_journey_description(self, journey_name: str) -> str:
         """Get description for journey type."""
         descriptions = {
-            "Wallet_Connection_Flow": "User attempts to connect a DeFi wallet through modal interface",
+            "Authentication_Flow": "User attempts to log in or authenticate",
+            "Registration_Flow": "User attempts to register or create account",
             "Home_Navigation": "User navigates through main application pages",
             "Profile_Management": "User accesses and manages profile settings",
+            "Checkout_Flow": "User proceeds through checkout process",
+            "Shopping_Cart_Flow": "User manages shopping cart items",
             "Initial_Exploration": "Initial application exploration and element discovery"
         }
         return descriptions.get(journey_name, "User interaction sequence")
@@ -577,20 +658,24 @@ class SessionManager:
     def _get_journey_priority(self, journey_name: str) -> str:
         """Get test priority for journey type."""
         priorities = {
-            "Wallet_Connection_Flow": "High",
+            "Authentication_Flow": "High",
+            "Registration_Flow": "High",
+            "Checkout_Flow": "High",
             "Profile_Management": "Medium", 
+            "Shopping_Cart_Flow": "Medium",
             "Home_Navigation": "Medium",
             "Initial_Exploration": "Low"
         }
         return priorities.get(journey_name, "Medium")
     
     def _is_modal_action(self, action: dict) -> bool:
-        """Check if action involves modal interaction."""
+        """Check if action involves modal interaction (generic detection)."""
         action_data = action.get('action', {})
         element_text = action_data.get('text', '').upper()
         
-        # Check for modal trigger buttons
-        if 'CONNECT' in element_text and action_data.get('element_type') == 'button':
+        # Check for common modal trigger patterns
+        modal_triggers = ['MODAL', 'DIALOG', 'POPUP', 'LOGIN', 'REGISTER', 'CONNECT', 'SETTINGS']
+        if any(trigger in element_text for trigger in modal_triggers) and action_data.get('element_type') == 'button':
             return True
         
         # Check if action has modal results
@@ -602,8 +687,10 @@ class SessionManager:
         element_text = action_data.get('text', '').upper()
         element_type = action_data.get('element_type', '')
         
-        if 'CONNECT' in element_text:
-            return "WalletConnection"
+        if any(word in element_text for word in ['LOGIN', 'REGISTER', 'SIGN']):
+            return "Authentication"
+        elif any(word in element_text for word in ['CONNECT', 'MODAL']):
+            return "ModalInteraction"
         elif element_type == 'link':
             return "Navigation"
         elif element_type == 'button':
@@ -639,10 +726,12 @@ class SessionManager:
         element_text = action_data.get('text', '').upper()
         element_type = action_data.get('element_type', '')
         
-        if 'CONNECT' in element_text:
-            return "Verify modal appears with wallet options (Argent, Braavos)"
+        if any(word in element_text for word in ['LOGIN', 'REGISTER', 'SIGN']):
+            return "Verify authentication process initiates (modal/redirect)"
+        elif any(word in element_text for word in ['CONNECT', 'MODAL']):
+            return "Verify modal appears with expected options"
         elif element_type == 'link':
-            return "Verify state change or navigation occurs"
+            return "Verify navigation or state change occurs"
         elif element_type == 'button':
             return "Verify button action completes successfully"
         else:
@@ -724,7 +813,7 @@ class SessionManager:
                 messages=[
                     {
                         "role": "system", 
-                        "content": "You are an expert QA automation engineer specializing in integration test generation for DeFi web applications. Your primary goal is to analyze automated testing sessions and generate comprehensive, automatable test scenarios. Focus on user journey mapping, modal interactions, wallet connection workflows, and creating structured test cases that can be easily converted into automated tests using frameworks like Playwright or Selenium. Provide actionable test scenarios with specific selectors, assertions, and timing requirements."
+                        "content": "You are an expert QA automation engineer specializing in integration test generation for web applications. Your primary goal is to analyze automated testing sessions and generate comprehensive, automatable test scenarios. Focus on user journey mapping, modal interactions, form workflows, navigation patterns, and creating structured test cases that can be easily converted into automated tests using frameworks like Playwright or Selenium. Provide actionable test scenarios with specific selectors, assertions, and timing requirements."
                     },
                     {
                         "role": "user",
@@ -759,17 +848,16 @@ class SessionManager:
         
         summary = exploration_results.get('exploration_summary', {})
         
-        prompt = f"""You are an expert QA automation engineer analyzing a DeFi (Decentralized Finance) web application testing session to generate integration test scenarios.
+        prompt = f"""You are an expert QA automation engineer analyzing a web application testing session to generate integration test scenarios.
 
 IMPORTANT CONTEXT:
-
-
+- Application Type: {self._get_application_description(self._detect_application_type(exploration_results.get('detailed_results', {}).get('executed_actions', [])))}
 - Focus on user flow validation and functional correctness
 - Consider whether a sequence of events ( a user flow, or use-case ) is intuitive and easy to understand
 
 TESTING SESSION DATA:
-- Website: {self.base_url} (DeFi Application)
-- Application Type: Single Page Application (SPA)
+- Website: {self.base_url}
+- Application Type: {self._get_application_description(self._detect_application_type(exploration_results.get('detailed_results', {}).get('executed_actions', [])))}
 - Total Actions: {summary.get('total_actions_performed', 0)}
 - Success Rate: {summary.get('success_rate', 0):.1%}
 - Duration: {summary.get('duration', 0):.1f} seconds
@@ -782,9 +870,9 @@ PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated
 ANALYSIS REQUIREMENTS:
 
 1. **User Journey Analysis**: 
-   - Identify complete user workflows (e.g., wallet connection, navigation patterns, checkout, login)
+   - Identify complete user workflows (e.g., authentication, navigation patterns, form submissions, checkout processes)
    - Map ALL critical paths through the application
-   - Highlight modal-based interactions 
+   - Highlight modal-based interactions and form workflows 
 
 2. **Integration Test Scenarios**: For each identified workflow, provide:
    - Test name (clear, descriptive)
@@ -801,28 +889,29 @@ ANALYSIS REQUIREMENTS:
    - **Content Quality Tests**: UI text validation, typo detection, proofreading verification
 
 4. **Critical Focus Areas**:
-   - Modal workflows 
+   - Modal workflows and dialog interactions
    - State transitions and data persistence
-   - User authentication flows
-   - Cross-page functionality
-   - Application-specific critical use-cases where applicable (Add to cart, create session, login, etc)
+   - User authentication and registration flows
+   - Form validation and submission processes
+   - Cross-page functionality and navigation
+   - Application-specific critical use-cases where applicable (Add to cart, user profiles, search, etc)
 
 5. **Test Automation Ready Output**: 
    - Provide test scenarios in structured format that can be parsed
    - Include specific selectors, expected values, and timing considerations
    - Group related tests into test suites
 
-IGNORE THESE COMMON SPA PATTERNS (NOT BUGS):
-- Links that trigger state changes without URL navigation
-- JavaScript-driven content updates
-- Dynamic loading of page sections
-- Modal overlays for user interactions
+IGNORE THESE COMMON WEB APPLICATION PATTERNS (NOT BUGS):
+- Links that trigger state changes without URL navigation (common in SPAs)
+- JavaScript-driven content updates and dynamic loading
+- Modal overlays and dialog interactions
+- Asynchronous form submissions without page refresh
 
 OUTPUT FORMAT:
 Structure your response with clear sections:
 1. **User Experience Map**: High-level workflows identified exhaustively
 2. **Critical Test Scenarios**: Detailed test cases for automation
-3. **Integration Points**: External dependencies (wallets, APIs)
+3. **Integration Points**: External dependencies (APIs, third-party services, payment systems)
 4. **Recommended Test Priorities**: What to test first
 
 For each test scenario, use this format:
@@ -853,7 +942,7 @@ Focus on creating comprehensive, automatable test scenarios rather than identify
         # 1. Save raw ChatGPT response
         raw_file = self.session_dir / "reports" / "chatgpt_raw_response.txt"
         with open(raw_file, 'w', encoding='utf-8') as f:
-            f.write(f"Bug Analysis Report\n")
+            f.write(f"Integration Test Analysis Report\n")
             f.write(f"Generated: {timestamp}\n")
             f.write(f"Session: {self.session_id}\n")
             f.write(f"Website: {self.base_url}\n")
@@ -922,7 +1011,7 @@ Focus on creating comprehensive, automatable test scenarios rather than identify
         summary = structured_data.get("session_summary", {})
         flags = structured_data.get("automated_flags", {})
         
-        markdown = f"""# Bug Analysis Report
+        markdown = f"""# Integration Test Analysis Report
 
 ## 📊 Session Overview
 - **Website**: {metadata['website']}

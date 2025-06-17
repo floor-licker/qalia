@@ -546,12 +546,13 @@ class TypoDetector:
         
         prompt = f"""Please analyze these {len(sorted_candidates)} words found on a website to determine which are likely typos vs intentional words (brand names, technical terms, etc.).
 
-CONTEXT: This is from a DeFi (Decentralized Finance) website. Such sites often contain:
-- Crypto/blockchain terminology
+CONTEXT: This is from a web application. Such sites often contain:
+- Domain-specific terminology
 - Brand names and product names  
-- Technical jargon
-- Abbreviations and acronyms
+- Technical jargon and abbreviations
+- Acronyms and initialisms
 - Multi-language content
+- Industry-specific terms
 
 For each word, classify as:
 1. TYPO - Likely a spelling mistake
