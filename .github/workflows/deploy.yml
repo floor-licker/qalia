@@ -30,6 +30,12 @@ jobs:
         echo "Running tests..."
         # python -m pytest tests/ || true
 
+    - name: Debug secrets
+      run: |
+        echo "DO_HOST exists: ${{ secrets.DO_HOST != '' }}"
+        echo "DO_USERNAME exists: ${{ secrets.DO_USERNAME != '' }}"
+        echo "DO_SSH_KEY exists: ${{ secrets.DO_SSH_KEY != '' }}"
+        
     - name: Deploy to DigitalOcean
       uses: appleboy/ssh-action@v1.0.0
       with:
