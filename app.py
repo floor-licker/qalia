@@ -309,30 +309,38 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
             # Extract ChatGPT analysis status from exploration results
             exploration_results_data = results.get("exploration_results", {})
             if exploration_results_data:
-                # The exploration_results might contain session info with ChatGPT analysis status
-                session_info = exploration_results_data.get("session_info", {})
-                chatgpt_info = session_info.get("chatgpt_analysis")
-                
-                if chatgpt_info:
-                    analysis_summary["chatgpt_analysis"] = {
-                        "status": chatgpt_info.get("status", "unknown"),
-                        "error": chatgpt_info.get("error", None)
-                    }
-                elif session_info.get("session_dir"):
-                    # Try to read the session report directly to get ChatGPT status
-                    try:
-                        import json
-                        session_report_path = os.path.join(session_info["session_dir"], "reports", "session_report.json")
-                        if os.path.exists(session_report_path):
-                            with open(session_report_path, 'r') as f:
-                                session_data = json.load(f)
-                                chatgpt_info = session_data.get("chatgpt_analysis", {})
-                                analysis_summary["chatgpt_analysis"] = {
-                                    "status": chatgpt_info.get("status", "unknown"),
-                                    "error": chatgpt_info.get("error", None)
-                                }
-                    except Exception as e:
-                        logger.warning(f"Could not read ChatGPT analysis status from session report: {e}")
+                # Check if we have a session directory where ChatGPT analysis files were saved
+                session_dir = results.get("session_directory")
+                if session_dir:
+                    # Check if ChatGPT analysis files exist (this means analysis completed)
+                    chatgpt_md_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.md")
+                    chatgpt_json_path = os.path.join(session_dir, "reports", "chatgpt_bug_analysis.json")
+                    
+                    if os.path.exists(chatgpt_md_path) and os.path.exists(chatgpt_json_path):
+                        analysis_summary["chatgpt_analysis"] = {
+                            "status": "completed",
+                            "error": None
+                        }
+                        logger.info("ChatGPT analysis files found - marking as completed")
+                    else:
+                        # Files don't exist, check if there was an error
+                        try:
+                            import json
+                            session_report_path = os.path.join(session_dir, "reports", "session_report.json")
+                            if os.path.exists(session_report_path):
+                                with open(session_report_path, 'r') as f:
+                                    session_data = json.load(f)
+                                    chatgpt_info = session_data.get("chatgpt_analysis", {})
+                                    analysis_summary["chatgpt_analysis"] = {
+                                        "status": chatgpt_info.get("status", "failed"),
+                                        "error": chatgpt_info.get("error", "ChatGPT analysis files not found")
+                                    }
+                        except Exception as e:
+                            logger.warning(f"Could not read ChatGPT analysis status from session report: {e}")
+                            analysis_summary["chatgpt_analysis"] = {
+                                "status": "failed",
+                                "error": f"Could not determine ChatGPT status: {e}"
+                            }
             
             return analysis_summary
             
