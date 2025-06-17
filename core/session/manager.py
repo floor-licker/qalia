@@ -188,7 +188,23 @@ class SessionManager:
         logger.info(f"🤖 ChatGPT analysis XML saved: {analysis_xml_path}")
         
         # Automatically send to ChatGPT for analysis (if API key available)
-        await self.analyze_with_chatgpt(analysis_xml, exploration_results)
+        chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
+        
+        # Include ChatGPT analysis information in the report
+        if chatgpt_analysis_file:
+            report['chatgpt_analysis'] = {
+                'status': 'completed',
+                'analysis_file': str(chatgpt_analysis_file)
+            }
+        else:
+            report['chatgpt_analysis'] = {
+                'status': 'failed',
+                'error': 'ChatGPT analysis failed or API key not available'
+            }
+        
+        # Re-save the report with ChatGPT analysis info
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, default=str)
         
         logger.info(f"📋 Session report saved: {report_path}")
         return str(report_path)

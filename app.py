@@ -292,7 +292,11 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 "total_test_cases": 0,
                 "issues_found": 0,
                 "recommendations": [],
-                "config_used": "qalia.yml" if config else "environment_variables"
+                "config_used": "qalia.yml" if config else "environment_variables",
+                "chatgpt_analysis": {
+                    "status": "unknown",
+                    "error": None
+                }
             }
             
             # Extract key metrics
@@ -301,6 +305,34 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
             
             analysis_summary["total_test_cases"] = test_summary.get("generation_summary", {}).get("total_test_cases", 0)
             analysis_summary["issues_found"] = exploration_summary.get("errors_found", 0)
+            
+            # Extract ChatGPT analysis status from exploration results
+            exploration_results_data = results.get("exploration_results", {})
+            if exploration_results_data:
+                # The exploration_results might contain session info with ChatGPT analysis status
+                session_info = exploration_results_data.get("session_info", {})
+                chatgpt_info = session_info.get("chatgpt_analysis")
+                
+                if chatgpt_info:
+                    analysis_summary["chatgpt_analysis"] = {
+                        "status": chatgpt_info.get("status", "unknown"),
+                        "error": chatgpt_info.get("error", None)
+                    }
+                elif session_info.get("session_dir"):
+                    # Try to read the session report directly to get ChatGPT status
+                    try:
+                        import json
+                        session_report_path = os.path.join(session_info["session_dir"], "reports", "session_report.json")
+                        if os.path.exists(session_report_path):
+                            with open(session_report_path, 'r') as f:
+                                session_data = json.load(f)
+                                chatgpt_info = session_data.get("chatgpt_analysis", {})
+                                analysis_summary["chatgpt_analysis"] = {
+                                    "status": chatgpt_info.get("status", "unknown"),
+                                    "error": chatgpt_info.get("error", None)
+                                }
+                    except Exception as e:
+                        logger.warning(f"Could not read ChatGPT analysis status from session report: {e}")
             
             return analysis_summary
             
@@ -319,6 +351,11 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
     if analysis_results["status"] == "completed":
         conclusion = "success" if analysis_results["issues_found"] == 0 else "neutral"
         title = f"Qalia.ai Analysis Complete - {analysis_results['total_test_cases']} tests generated"
+        
+        # Check ChatGPT analysis status
+        chatgpt_status = analysis_results.get("chatgpt_analysis", {}).get("status", "unknown")
+        chatgpt_error = analysis_results.get("chatgpt_analysis", {}).get("error", None)
+        
         summary = f"""
 ## 🤖 Qalia.ai Analysis Results
 
@@ -327,7 +364,24 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
 ### 📊 Summary
 - **Test Cases Generated:** {analysis_results['total_test_cases']}
 - **Issues Found:** {analysis_results['issues_found']}
-- **Status:** ✅ Analysis completed successfully
+- **Status:** ✅ Analysis completed successfully"""
+
+        # Add ChatGPT analysis information
+        if chatgpt_status == "completed":
+            summary += """
+- **AI Analysis:** ✅ Completed with detailed insights"""
+        elif chatgpt_status == "failed":
+            if chatgpt_error and "OpenAI" in chatgpt_error:
+                summary += """
+- **AI Analysis:** ⚠️ Failed due to OpenAI API issues"""
+            else:
+                summary += """
+- **AI Analysis:** ⚠️ Failed - check logs for details"""
+        else:
+            summary += """
+- **AI Analysis:** ❓ Status unknown"""
+
+        summary += """
 
 ### 🧪 Generated Tests
 Qalia.ai has automatically generated comprehensive test suites for your application. The tests cover:
@@ -372,6 +426,11 @@ async def comment_on_pr(g: Github, repo_name: str, pr_number: int, analysis_resu
     pr = repo.get_pull(pr_number)
     
     if analysis_results["status"] == "completed":
+        # Check ChatGPT analysis status for detailed reporting
+        chatgpt_status = analysis_results.get("chatgpt_analysis", {}).get("status", "unknown")
+        chatgpt_error = analysis_results.get("chatgpt_analysis", {}).get("error", None)
+        
+        # Build the comment with ChatGPT status information
         comment = f"""
 ## 🤖 Qalia.ai Analysis Results
 
@@ -389,7 +448,42 @@ I've analyzed your application and generated **{analysis_results['total_test_cas
 - Form validation tests
 - Error handling scenarios
 
-The generated tests are available in the workflow artifacts. You can download and integrate them into your testing pipeline.
+The generated tests are available in the workflow artifacts. You can download and integrate them into your testing pipeline."""
+
+        # Add ChatGPT analysis status information
+        if chatgpt_status == "completed":
+            comment += """
+
+### 🧠 AI Analysis
+✅ **Detailed ChatGPT analysis completed** - comprehensive insights and test scenarios generated
+"""
+        elif chatgpt_status == "failed":
+            if chatgpt_error and "OpenAI" in chatgpt_error:
+                comment += """
+
+### 🧠 AI Analysis
+⚠️ **ChatGPT analysis failed due to OpenAI API issues** - basic test generation completed, but detailed AI insights are unavailable
+"""
+            elif chatgpt_error:
+                comment += f"""
+
+### 🧠 AI Analysis
+⚠️ **ChatGPT analysis failed** - {chatgpt_error}
+"""
+            else:
+                comment += """
+
+### 🧠 AI Analysis
+⚠️ **ChatGPT analysis failed** - basic test generation completed, but detailed AI insights are unavailable
+"""
+        else:
+            comment += """
+
+### 🧠 AI Analysis
+❓ **ChatGPT analysis status unknown** - please check the workflow logs for details
+"""
+
+        comment += """
 
 ---
 *Powered by Qalia.ai - AI-powered QA testing for your repositories*
