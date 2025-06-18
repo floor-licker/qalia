@@ -310,19 +310,14 @@ class SessionManager:
             if not action_history:
                 action_history = exploration_results.get('actions_performed', [])
         
-        # Determine application type dynamically
-        app_type = self._detect_application_type(action_history)
-        
         root = Element("IntegrationTestAnalysis")
         root.set("domain", self.base_url)
         root.set("session_id", self.session_id)
         root.set("timestamp", str(time.time()))
         root.set("total_actions", str(len(action_history)))
-        root.set("application_type", app_type)
         
         # Enhanced Session Summary with test context
         summary = SubElement(root, "SessionSummary")
-        SubElement(summary, "ApplicationType").text = self._get_application_description(app_type)
         SubElement(summary, "TotalActions").text = str(len(action_history))
         SubElement(summary, "SuccessfulActions").text = str(sum(1 for action in action_history if action.get('success', False)))
         SubElement(summary, "FailedActions").text = str(sum(1 for action in action_history if not action.get('success', True)))
@@ -551,49 +546,7 @@ class SessionManager:
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")
     
-    def _detect_application_type(self, action_history: list) -> str:
-        """Dynamically detect application type based on actions performed."""
-        if not action_history:
-            return "WebApplication"
-        
-        # Count different types of interactions
-        modal_actions = sum(1 for action in action_history if self._is_modal_action(action))
-        form_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'input')
-        button_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'button')
-        link_actions = sum(1 for action in action_history if action.get('action', {}).get('element_type') == 'link')
-        
-        # Look for specific patterns in text content
-        all_text = ' '.join([action.get('action', {}).get('text', '') for action in action_history]).lower()
-        
-        # Detect application characteristics
-        if 'wallet' in all_text or 'connect' in all_text and 'crypto' in all_text:
-            return "DeFi_Application"
-        elif 'cart' in all_text or 'checkout' in all_text or 'purchase' in all_text:
-            return "ECommerce_Application"
-        elif 'login' in all_text or 'register' in all_text or 'profile' in all_text:
-            return "UserAccount_Application"
-        elif modal_actions > len(action_history) * 0.3:  # >30% modal interactions
-            return "Modal_Heavy_SPA"
-        elif form_actions > len(action_history) * 0.4:  # >40% form interactions
-            return "Form_Heavy_Application"
-        elif link_actions < len(action_history) * 0.1:  # <10% traditional links
-            return "Single_Page_Application"
-        else:
-            return "Traditional_WebApplication"
-    
-    def _get_application_description(self, app_type: str) -> str:
-        """Get human-readable description for application type."""
-        descriptions = {
-            "DeFi_Application": "Decentralized Finance Application",
-            "ECommerce_Application": "E-Commerce Application",
-            "UserAccount_Application": "User Account Management Application",
-            "Modal_Heavy_SPA": "Modal-Heavy Single Page Application",
-            "Form_Heavy_Application": "Form-Heavy Application",
-            "Single_Page_Application": "Single Page Application",
-            "Traditional_WebApplication": "Traditional Multi-Page Web Application",
-            "WebApplication": "Generic Web Application"
-        }
-        return descriptions.get(app_type, "Web Application")
+
     
     def _get_button_expected_behavior(self, element_text: str) -> str:
         """Get expected behavior for button based on its text content."""
@@ -889,12 +842,8 @@ class SessionManager:
             if not action_history:
                 action_history = exploration_results.get('actions_performed', [])
         
-        app_type = self._detect_application_type(action_history)
-        app_description = self._get_application_description(app_type)
-        
         # Format the prompt with actual values
         prompt = prompt_template.format(
-            application_type=app_description,
             base_url=self.base_url,
             total_actions=summary.get('total_actions_performed', 0),
             success_rate=f"{summary.get('success_rate', 0):.1%}",

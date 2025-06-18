@@ -260,7 +260,7 @@ class TestCaseGenerator:
     def _determine_journey_name(self, action_text: str, element_type: str) -> str:
         """Determine journey name based on trigger action."""
         if 'CONNECT' in action_text:
-            return "wallet_connection_flow"
+            return "connection_flow"
         elif 'HOME' in action_text:
             return "home_navigation"
         elif 'PROFILE' in action_text:
@@ -360,10 +360,10 @@ class TestCaseGenerator:
             # Add assertions based on expected behavior
             if 'CONNECT' in text.upper():
                 step.assertions.append(TestAssertion(
-                    type='visible',
-                    selector='[role="dialog"], .modal, [data-testid*="modal"]',
+                    type='state_change',
+                    selector='',
                     expected='true',
-                    description="Modal should appear after clicking CONNECT"
+                    description="Application state should change after clicking CONNECT"
                 ))
             elif element_type == 'link':
                 step.assertions.append(TestAssertion(
@@ -443,7 +443,7 @@ class TestCaseGenerator:
     
     def _get_journey_priority(self, journey_name: str) -> TestPriority:
         """Determine test priority based on journey type."""
-        critical_journeys = ['wallet_connection_flow', 'authentication_flow']
+        critical_journeys = ['authentication_flow', 'registration_flow']
         high_journeys = ['profile_management', 'dashboard_exploration']
         
         if journey_name in critical_journeys:
@@ -457,8 +457,8 @@ class TestCaseGenerator:
     
     def _categorize_workflow(self, journey_name: str) -> str:
         """Categorize workflow for organization."""
-        if 'wallet' in journey_name or 'connect' in journey_name:
-            return "wallet_integration"
+        if 'connection' in journey_name:
+            return "integration"
         elif 'auth' in journey_name or 'login' in journey_name:
             return "authentication"
         elif 'nav' in journey_name or 'home' in journey_name:
