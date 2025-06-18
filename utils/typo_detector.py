@@ -600,7 +600,7 @@ Please respond in this JSON format:
         
         return prompt
     
-    async def analyze_with_llm(self, api_key: str = None) -> Optional[LLMTypoAnalysis]:
+    async def analyze_with_llm(self, api_key: str = None) -> LLMTypoAnalysis:
         """
         Send word candidates to LLM for analysis.
         
@@ -694,30 +694,13 @@ Please respond in this JSON format:
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse LLM response as JSON: {e}")
-                logger.warning(f"Raw response (first 500 chars): {response_text[:500]}...")
-                
-                # Create a fallback analysis with just the raw response
-                fallback_analysis = LLMTypoAnalysis(
-                    analyzed_words=len(self.word_candidates),
-                    confirmed_typos=[],
-                    intentional_words=[],
-                    uncertain_words=[],
-                    analysis_reasoning=f"JSON parsing failed. Raw response: {response_text}",
-                    confidence_score=0.0
-                )
-                
-                # Still save the raw response for manual review
-                if self.session_dir:
-                    await self._save_llm_analysis(fallback_analysis)
-                
-                return fallback_analysis
+                logger.error(f"Raw response (first 500 chars): {response_text[:500]}...")
+                raise ValueError(f"❌ CRITICAL: LLM returned unparseable response. This indicates an AI model issue: {e}")
                 
         except ImportError:
-            logger.error("❌ OpenAI library not installed. Run: pip install openai>=1.0.0")
-            return None
+            raise ImportError("❌ CRITICAL: OpenAI library not installed. Typo analysis requires OpenAI. Run: pip install openai>=1.0.0")
         except Exception as e:
-            logger.error(f"❌ LLM analysis failed: {e}")
-            return None
+            raise RuntimeError(f"❌ CRITICAL: LLM typo analysis failed: {e}")
     
     def _convert_confidence_to_score(self, confidence_str: str) -> float:
         """Convert confidence string to numeric score."""

@@ -188,17 +188,16 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                         # We'll handle this in the analysis logic below
                         pass
         
-        # Still try to install browsers as fallback
-        logger.info("Installing Playwright browsers as fallback...")
+        # Install Playwright browsers - REQUIRED for analysis
+        logger.info("Installing Playwright browsers...")
         result = subprocess.run(["python", "-m", "playwright", "install", "chromium"], 
                               capture_output=True, text=True, timeout=180)
-        if result.returncode == 0:
-            logger.info("Playwright chromium installed successfully")
-        else:
-            logger.warning(f"Playwright install warning: {result.stderr}")
+        if result.returncode != 0:
+            raise RuntimeError(f"❌ CRITICAL: Playwright browser installation failed: {result.stderr}")
+        logger.info("Playwright chromium installed successfully")
             
     except Exception as e:
-        logger.warning(f"Browser setup warning: {e}")
+        raise RuntimeError(f"❌ CRITICAL: Browser setup failed: {e}. Cannot proceed with analysis without browsers.")
     
     try:
         # Check if qalia.yml exists first
@@ -315,24 +314,15 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 session_dir = results.get("session_directory")
                 logger.info(f"DEBUG: session_dir: {session_dir}")
                 
-                # If session_dir is None, try to find it from other sources or discover it
+                # If session_dir is None, this is a critical error - the exploration should have provided it
                 if not session_dir:
-                    # Try alternative sources
+                    # Try alternative sources once
                     session_info = exploration_results_data.get('session_info', {})
                     session_dir = session_info.get('session_dir')
-                    logger.info(f"DEBUG: Fallback session_dir from session_info: {session_dir}")
                     
-                    # If still None, try to find the latest session directory
+                    # If still None, this is a critical failure in the exploration pipeline
                     if not session_dir:
-                        import glob
-                        session_pattern = "exploration_sessions/localhost_*_*/reports"
-                        session_dirs = glob.glob(session_pattern)
-                        if session_dirs:
-                            # Get the most recent session directory
-                            session_dirs.sort(reverse=True)
-                            latest_session = session_dirs[0].replace('/reports', '')
-                            session_dir = latest_session
-                            logger.info(f"DEBUG: Found latest session directory: {session_dir}")
+                        raise RuntimeError("❌ CRITICAL: Session directory not provided by exploration pipeline. This indicates a failure in the analysis process.")
                 
                 if session_dir:
                     # Check if ChatGPT analysis files exist (this means analysis completed)

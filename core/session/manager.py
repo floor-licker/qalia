@@ -1175,29 +1175,7 @@ The following words need human judgment:
             except Exception as e:
                 logger.warning(f"Failed to read LLM typo analysis: {e}")
         
-        # Fallback to basic typo analysis file if LLM analysis not available
-        if typo_analysis_file.exists():
-            try:
-                with open(typo_analysis_file, 'r', encoding='utf-8') as f:
-                    raw_content = f.read()
-                    
-                # Extract key info from the text file
-                lines = raw_content.split('\n')
-                summary_lines = []
-                
-                for line in lines:
-                    if 'Total word candidates analyzed:' in line or \
-                       'Confirmed typos:' in line or \
-                       'Intentional words:' in line or \
-                       'Analysis confidence:' in line:
-                        summary_lines.append(f"- **{line.strip()}**")
-                
-                if summary_lines:
-                    content = "### 📊 Summary\n" + '\n'.join(summary_lines) + "\n\n"
-                    content += "See detailed typo analysis report for complete breakdown.\n"
-                    return content
-                        
-            except Exception as e:
-                logger.warning(f"Failed to read typo analysis summary: {e}")
-        
+        # If no LLM analysis available, this is an error condition since typo analysis should always complete
+        # The typo detector should have failed fast rather than creating incomplete analysis files
+        logger.warning("❌ LLM typo analysis file missing - this indicates a critical failure in typo analysis pipeline")
         return "" 
