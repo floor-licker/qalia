@@ -743,15 +743,25 @@ class SessionManager:
             if "[XML_REPORT_PLACEHOLDER]" not in prompt:
                 raise RuntimeError("❌ CRITICAL: Prompt template is missing XML placeholder. Analysis would be incomplete.")
             
-            # Replace the XML placeholder with actual XML content
-            prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+            # Check if we should include state fingerprint XML (if it has > 1 state)
+            state_fingerprint_xml = self._load_state_fingerprint_xml_if_valuable()
+            
+            if state_fingerprint_xml:
+                # Combine both XMLs for enhanced analysis
+                combined_xml = self._combine_xml_files(xml_content, state_fingerprint_xml)
+                prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", combined_xml)
+                logger.info("🔗 Including state fingerprint XML for enhanced analysis (multiple states detected)")
+            else:
+                # Use only action analysis XML
+                prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+                logger.info("📄 Using action analysis XML only (insufficient state data for enhancement)")
             
             # Final validation - ensure XML was actually inserted
             if "[XML_REPORT_PLACEHOLDER]" in prompt:
                 raise RuntimeError("❌ CRITICAL: XML placeholder was not properly replaced in prompt.")
             
             # Ensure XML content is actually in the prompt
-            if not any(xml_indicator in prompt for xml_indicator in ["<IntegrationTestAnalysis", "<?xml", "<ApplicationStateFingerprint"]):
+            if not any(xml_indicator in prompt for xml_indicator in ["<IntegrationTestAnalysis", "<?xml", "<ApplicationStateFingerprint", "<CombinedAnalysis"]):
                 raise RuntimeError("❌ CRITICAL: XML content does not appear to be present in final prompt.")
             
             logger.info("🤖 Sending XML to ChatGPT for automated bug analysis...")
@@ -1090,4 +1100,87 @@ The following words need human judgment:
         # If no LLM analysis available, this is an error condition since typo analysis should always complete
         # The typo detector should have failed fast rather than creating incomplete analysis files
         logger.warning("❌ LLM typo analysis file missing - this indicates a critical failure in typo analysis pipeline")
-        return "" 
+        return ""
+    
+    def _load_state_fingerprint_xml_if_valuable(self) -> Optional[str]:
+        """
+        Load state fingerprint XML only if it contains valuable data (> 1 state).
+        
+        Returns:
+            State fingerprint XML content if valuable, None otherwise
+        """
+        # Look for state fingerprint XML file
+        state_fingerprint_file = self.session_dir / "reports" / f"state_fingerprint_{self.domain}.xml"
+        
+        if not state_fingerprint_file.exists():
+            logger.debug(f"State fingerprint XML not found: {state_fingerprint_file}")
+            return None
+        
+        try:
+            with open(state_fingerprint_file, 'r', encoding='utf-8') as f:
+                xml_content = f.read()
+            
+            # Parse XML to check state count
+            from xml.etree.ElementTree import fromstring
+            root = fromstring(xml_content)
+            
+            # Check if ApplicationStateFingerprint has meaningful state data
+            if root.tag == "ApplicationStateFingerprint":
+                total_states = int(root.get("total_states", "0"))
+                
+                if total_states > 1:
+                    logger.info(f"✅ State fingerprint XML contains {total_states} states - including for enhanced analysis")
+                    return xml_content
+                else:
+                    logger.debug(f"State fingerprint XML has only {total_states} states - not valuable enough for inclusion")
+                    return None
+            else:
+                logger.warning(f"State fingerprint XML has unexpected root element: {root.tag}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse state fingerprint XML: {e}")
+            return None
+    
+    def _combine_xml_files(self, action_xml: str, state_xml: str) -> str:
+        """
+        Combine action analysis XML and state fingerprint XML into a single document.
+        
+        Args:
+            action_xml: Action analysis XML content
+            state_xml: State fingerprint XML content
+            
+        Returns:
+            Combined XML content with both analyses
+        """
+        try:
+            from xml.etree.ElementTree import fromstring, tostring
+            
+            # Parse both XML documents to validate they're well-formed and get root elements
+            action_root = fromstring(action_xml)
+            state_root = fromstring(state_xml)
+            
+            # Convert parsed elements back to strings (without XML declarations)
+            action_content = tostring(action_root, encoding='unicode')
+            state_content = tostring(state_root, encoding='unicode')
+            
+            # Create a wrapper element to contain both analyses
+            combined_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<CombinedAnalysis session_id="{self.session_id}" domain="{self.base_url}">
+    <ActionAnalysis>
+{action_content}
+    </ActionAnalysis>
+    <StateFingerprint>
+{state_content}
+    </StateFingerprint>
+</CombinedAnalysis>'''
+            
+            # Validate the combined XML is well-formed
+            fromstring(combined_xml)
+            
+            return combined_xml
+            
+        except Exception as e:
+            logger.error(f"Failed to combine XML files: {e}")
+            # Fall back to action XML only if combination fails
+            raise RuntimeError(f"❌ CRITICAL: Failed to combine XML files: {e}") 
