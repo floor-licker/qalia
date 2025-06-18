@@ -549,51 +549,40 @@ class SessionManager:
 
     
     def _get_button_expected_behavior(self, element_text: str) -> str:
-        """Get expected behavior for button based on its text content."""
-        text_upper = element_text.upper()
-        
-        if any(word in text_upper for word in ['CONNECT', 'LOGIN', 'SIGN IN']):
-            return "Authentication modal or login process should trigger"
-        elif any(word in text_upper for word in ['SUBMIT', 'SAVE', 'SEND']):
-            return "Form submission or data processing should occur"
-        elif any(word in text_upper for word in ['ADD', 'CREATE', 'NEW']):
-            return "Item creation or addition workflow should start"
-        elif any(word in text_upper for word in ['DELETE', 'REMOVE', 'CANCEL']):
-            return "Confirmation dialog or removal action should occur"
-        elif any(word in text_upper for word in ['CLOSE', 'DISMISS']):
-            return "Modal or overlay should close"
-        else:
-            return "Button action should trigger appropriate response"
+        """Get generic expected behavior for button - let LLM determine specific behavior."""
+        # Generic expectation - let LLM interpret the specific behavior based on context
+        return "Button interaction should trigger appropriate application response"
     
     def _extract_user_journeys(self, action_history: list) -> dict:
-        """Extract logical user journeys from action sequence."""
+        """Extract logical user journeys from action sequence - generic grouping only."""
         journeys = {}
         current_journey = []
+        journey_count = 1
         journey_name = "Initial_Exploration"
         
-        for action in action_history:
+        for i, action in enumerate(action_history):
             action_text = action.get('action', {}).get('text', '').upper()
+            element_type = action.get('action', {}).get('element_type', '')
             
-            # Start new journey on significant navigation or interaction patterns
-            if any(keyword in action_text for keyword in ['HOME', 'PROFILE', 'LOGIN', 'REGISTER', 'CHECKOUT', 'CART']):
+            # Start new journey on significant navigation (links) or major UI changes
+            # Use generic criteria instead of hardcoded keywords
+            is_navigation = element_type == 'link' and len(action_text) > 0
+            is_major_interaction = element_type == 'button' and len(action_text) > 3
+            is_journey_boundary = (i > 0 and i % 10 == 0)  # Every 10 actions as fallback grouping
+            
+            if is_navigation or is_major_interaction or is_journey_boundary:
                 if current_journey:
                     journeys[journey_name] = current_journey
                 
-                if 'HOME' in action_text:
-                    journey_name = "Home_Navigation"
-                elif any(word in action_text for word in ['LOGIN', 'SIGN IN']):
-                    journey_name = "Authentication_Flow"
-                elif 'PROFILE' in action_text:
-                    journey_name = "Profile_Management"
-                elif 'REGISTER' in action_text or 'SIGN UP' in action_text:
-                    journey_name = "Registration_Flow"
-                elif 'CHECKOUT' in action_text:
-                    journey_name = "Checkout_Flow"
-                elif 'CART' in action_text:
-                    journey_name = "Shopping_Cart_Flow"
+                # Generic journey naming - let LLM interpret the actual purpose
+                if is_navigation:
+                    journey_name = f"Navigation_Sequence_{journey_count}"
+                elif is_major_interaction:
+                    journey_name = f"Interaction_Sequence_{journey_count}"
                 else:
-                    journey_name = f"Journey_{len(journeys) + 1}"
+                    journey_name = f"Action_Sequence_{journey_count}"
                 
+                journey_count += 1
                 current_journey = []
             
             current_journey.append(action)
@@ -605,60 +594,40 @@ class SessionManager:
         return journeys
     
     def _get_journey_description(self, journey_name: str) -> str:
-        """Get description for journey type."""
-        descriptions = {
-            "Authentication_Flow": "User attempts to log in or authenticate",
-            "Registration_Flow": "User attempts to register or create account",
-            "Home_Navigation": "User navigates through main application pages",
-            "Profile_Management": "User accesses and manages profile settings",
-            "Checkout_Flow": "User proceeds through checkout process",
-            "Shopping_Cart_Flow": "User manages shopping cart items",
-            "Initial_Exploration": "Initial application exploration and element discovery"
-        }
-        return descriptions.get(journey_name, "User interaction sequence")
+        """Get generic description for journey type - let LLM determine specific purpose."""
+        if "Navigation" in journey_name:
+            return "User navigation sequence through application"
+        elif "Interaction" in journey_name:
+            return "User interaction sequence with application elements"
+        elif "Initial_Exploration" in journey_name:
+            return "Initial application exploration and element discovery"
+        else:
+            return "User action sequence"
     
     def _get_journey_priority(self, journey_name: str) -> str:
-        """Get test priority for journey type."""
-        priorities = {
-            "Authentication_Flow": "High",
-            "Registration_Flow": "High",
-            "Checkout_Flow": "High",
-            "Profile_Management": "Medium", 
-            "Shopping_Cart_Flow": "Medium",
-            "Home_Navigation": "Medium",
-            "Initial_Exploration": "Low"
-        }
-        return priorities.get(journey_name, "Medium")
+        """Get generic priority for journey type - let LLM determine specific importance."""
+        # All journeys get medium priority - let LLM decide actual importance based on context
+        return "Medium"
     
     def _is_modal_action(self, action: dict) -> bool:
-        """Check if action involves modal interaction (generic detection)."""
-        action_data = action.get('action', {})
-        element_text = action_data.get('text', '').upper()
-        
-        # Check for common modal trigger patterns
-        modal_triggers = ['MODAL', 'DIALOG', 'POPUP', 'LOGIN', 'REGISTER', 'CONNECT', 'SETTINGS']
-        if any(trigger in element_text for trigger in modal_triggers) and action_data.get('element_type') == 'button':
-            return True
-        
-        # Check if action has modal results
+        """Check if action involves modal interaction - based on actual results, not assumptions."""
+        # Only check if action actually produced modal results, not text-based assumptions
         return 'modal_results' in action
     
     def _categorize_action_for_testing(self, action: dict) -> str:
-        """Categorize action for test organization."""
+        """Categorize action for test organization - generic categories only."""
         action_data = action.get('action', {})
-        element_text = action_data.get('text', '').upper()
         element_type = action_data.get('element_type', '')
         
-        if any(word in element_text for word in ['LOGIN', 'REGISTER', 'SIGN']):
-            return "Authentication"
-        elif any(word in element_text for word in ['CONNECT', 'MODAL']):
-            return "ModalInteraction"
-        elif element_type == 'link':
+        # Use only element type for categorization - let LLM determine semantic meaning
+        if element_type == 'link':
             return "Navigation"
         elif element_type == 'button':
             return "ButtonAction"
         elif element_type == 'input':
             return "FormInput"
+        elif 'modal_results' in action:
+            return "ModalInteraction"
         else:
             return "General"
     
@@ -673,29 +642,23 @@ class SessionManager:
             return f"{element_type}[data-testid], {element_type}[id], {element_type}[class]"
     
     def _determine_app_state(self, action: dict) -> str:
-        """Determine application state based on action context."""
+        """Determine generic application state - let LLM interpret specific page types."""
         url = action.get('url', '')
-        if 'profile' in url:
-            return "ProfilePage"
-        elif url.endswith('/'):
-            return "HomePage"
-        else:
-            return "UnknownState"
+        # Generic state description - let LLM determine actual page purpose
+        return f"Page_State_{hash(url) % 1000}"
     
     def _generate_test_assertion(self, action: dict) -> str:
-        """Generate appropriate test assertion for action."""
+        """Generate generic test assertion - let LLM determine specific validation needs."""
         action_data = action.get('action', {})
-        element_text = action_data.get('text', '').upper()
         element_type = action_data.get('element_type', '')
         
-        if any(word in element_text for word in ['LOGIN', 'REGISTER', 'SIGN']):
-            return "Verify authentication process initiates (modal/redirect)"
-        elif any(word in element_text for word in ['CONNECT', 'MODAL']):
-            return "Verify modal appears with expected options"
-        elif element_type == 'link':
+        # Generic assertions based only on element type
+        if element_type == 'link':
             return "Verify navigation or state change occurs"
         elif element_type == 'button':
-            return "Verify button action completes successfully"
+            return "Verify button interaction completes successfully"
+        elif element_type == 'input':
+            return "Verify input accepts and retains entered value"
         else:
             return "Verify element interaction succeeds"
     

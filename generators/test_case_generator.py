@@ -258,21 +258,14 @@ class TestCaseGenerator:
         return False
     
     def _determine_journey_name(self, action_text: str, element_type: str) -> str:
-        """Determine journey name based on trigger action."""
-        if 'CONNECT' in action_text:
-            return "connection_flow"
-        elif 'HOME' in action_text:
-            return "home_navigation"
-        elif 'PROFILE' in action_text:
-            return "profile_management"
-        elif 'LOGIN' in action_text:
-            return "authentication_flow"
-        elif 'DASHBOARD' in action_text:
-            return "dashboard_exploration"
-        elif element_type == 'link':
-            return f"navigation_to_{action_text.lower().replace(' ', '_')}"
+        """Determine generic journey name - let LLM interpret actual purpose."""
+        # Generic naming based on element type only
+        if element_type == 'link':
+            return f"navigation_sequence_{int(time.time())}"
+        elif element_type == 'button':
+            return f"interaction_sequence_{int(time.time())}"
         else:
-            return f"interaction_flow_{int(time.time())}"
+            return f"action_sequence_{int(time.time())}"
     
     def _generate_journey_test_cases(self, journey_name: str, actions: List[Dict]) -> List[TestCase]:
         """Generate test cases for a specific user journey."""
@@ -442,31 +435,19 @@ class TestCaseGenerator:
         return ', '.join(selectors)
     
     def _get_journey_priority(self, journey_name: str) -> TestPriority:
-        """Determine test priority based on journey type."""
-        critical_journeys = ['authentication_flow', 'registration_flow']
-        high_journeys = ['profile_management', 'dashboard_exploration']
-        
-        if journey_name in critical_journeys:
-            return TestPriority.CRITICAL
-        elif journey_name in high_journeys:
-            return TestPriority.HIGH
-        elif 'navigation' in journey_name:
-            return TestPriority.MEDIUM
-        else:
-            return TestPriority.LOW
+        """Determine generic test priority - let LLM assess actual importance."""
+        # All journeys get medium priority - let LLM determine actual importance
+        return TestPriority.MEDIUM
     
     def _categorize_workflow(self, journey_name: str) -> str:
-        """Categorize workflow for organization."""
-        if 'connection' in journey_name:
-            return "integration"
-        elif 'auth' in journey_name or 'login' in journey_name:
-            return "authentication"
-        elif 'nav' in journey_name or 'home' in journey_name:
+        """Categorize workflow generically - let LLM determine specific purpose."""
+        # Generic categorization based on journey type only
+        if 'navigation' in journey_name:
             return "navigation"
-        elif 'profile' in journey_name or 'settings' in journey_name:
-            return "user_management"
+        elif 'interaction' in journey_name:
+            return "interaction"
         else:
-            return "general_interaction"
+            return "general"
     
     def _create_error_handling_variants(self, journey_name: str, actions: List[Dict]) -> List[TestCase]:
         """Create error handling test variants."""
