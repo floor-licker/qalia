@@ -265,8 +265,10 @@ class StateManager:
             return {}
     
     def _generate_fallback_hash(self, url: str) -> str:
-        """Generate fallback hash when other methods fail."""
-        fallback_data = f"{url}|{time.time()}"
+        """Generate deterministic fallback hash when other methods fail."""
+        # Use URL + a constant to ensure deterministic hashing for same URL
+        # This prevents the timestamp-based issue that creates different hashes for same state
+        fallback_data = f"{url}|FALLBACK_STATE_MARKER"
         return hashlib.md5(fallback_data.encode()).hexdigest()[:12]
     
     async def _record_state_transition(self, from_state: str, to_state: str, to_url: str) -> None:

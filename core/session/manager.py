@@ -182,25 +182,34 @@ class SessionManager:
         
         # Generate and save detailed action analysis XML for ChatGPT
         analysis_xml = self.generate_detailed_action_analysis_xml(exploration_results)
+        
+        # Validate that XML was actually generated
+        if not analysis_xml or not analysis_xml.strip():
+            raise RuntimeError("❌ CRITICAL: XML generation failed - empty or None result")
+        
+        # Validate that XML is well-formed
+        try:
+            from xml.etree.ElementTree import fromstring
+            fromstring(analysis_xml)
+        except Exception as e:
+            raise RuntimeError(f"❌ CRITICAL: Generated XML is malformed: {e}")
+        
         analysis_xml_path = self.session_dir / "reports" / "action_analysis_for_chatgpt.xml"
         with open(analysis_xml_path, 'w', encoding='utf-8') as f:
             f.write(analysis_xml)
         logger.info(f"🤖 ChatGPT analysis XML saved: {analysis_xml_path}")
         
-        # Automatically send to ChatGPT for analysis (if API key available)
-        chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
-        
-        # Include ChatGPT analysis information in the report
-        if chatgpt_analysis_file:
+        # Automatically send to ChatGPT for analysis - FAIL FAST if any issues
+        try:
+            chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
             report['chatgpt_analysis'] = {
                 'status': 'completed',
                 'analysis_file': str(chatgpt_analysis_file)
             }
-        else:
-            report['chatgpt_analysis'] = {
-                'status': 'failed',
-                'error': 'ChatGPT analysis failed or API key not available'
-            }
+        except Exception as e:
+            logger.error(f"❌ CRITICAL: XML analysis pipeline failed: {e}")
+            # Re-raise the exception - we should not continue with incomplete analysis
+            raise RuntimeError(f"❌ CRITICAL: Session report generation failed due to XML analysis failure: {e}") from e
         
         # Re-save the report with ChatGPT analysis info
         with open(report_path, 'w', encoding='utf-8') as f:
@@ -781,7 +790,7 @@ class SessionManager:
         else:
             return "Monitor error frequency and impact on user experience"
     
-    async def analyze_with_chatgpt(self, xml_content: str, exploration_results: Dict[str, Any]) -> Optional[str]:
+    async def analyze_with_chatgpt(self, xml_content: str, exploration_results: Dict[str, Any]) -> str:
         """
         Automatically send XML analysis to ChatGPT and save the response.
         
@@ -794,9 +803,18 @@ class SessionManager:
         """
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
-            logger.warning("⚠️ OPENAI_API_KEY not found in .env - skipping automatic ChatGPT analysis")
-            logger.info("💡 To enable automatic analysis, add OPENAI_API_KEY to your .env file")
-            return None
+            raise RuntimeError("❌ CRITICAL: OPENAI_API_KEY not found in environment. XML analysis requires OpenAI API access.")
+        
+        # Validate XML content
+        if not xml_content or not xml_content.strip():
+            raise ValueError("❌ CRITICAL: XML content is empty or None. Cannot proceed with analysis.")
+        
+        # Basic XML validation - ensure it's well-formed
+        try:
+            from xml.etree.ElementTree import fromstring
+            fromstring(xml_content)
+        except Exception as e:
+            raise ValueError(f"❌ CRITICAL: XML content is malformed and cannot be parsed: {e}")
         
         try:
             from openai import AsyncOpenAI
@@ -805,8 +823,20 @@ class SessionManager:
             # Prepare the analysis prompt
             prompt = self._create_analysis_prompt(exploration_results)
             
+            # Validate that the prompt contains the XML placeholder
+            if "[XML_REPORT_PLACEHOLDER]" not in prompt:
+                raise RuntimeError("❌ CRITICAL: Prompt template is missing XML placeholder. Analysis would be incomplete.")
+            
             # Replace the XML placeholder with actual XML content
             prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+            
+            # Final validation - ensure XML was actually inserted
+            if "[XML_REPORT_PLACEHOLDER]" in prompt:
+                raise RuntimeError("❌ CRITICAL: XML placeholder was not properly replaced in prompt.")
+            
+            # Ensure XML content is actually in the prompt
+            if not any(xml_indicator in prompt for xml_indicator in ["<IntegrationTestAnalysis", "<?xml", "<ApplicationStateFingerprint"]):
+                raise RuntimeError("❌ CRITICAL: XML content does not appear to be present in final prompt.")
             
             logger.info("🤖 Sending XML to ChatGPT for automated bug analysis...")
             
@@ -840,12 +870,9 @@ class SessionManager:
             return response_files[0]  # Return primary analysis file
             
         except ImportError:
-            logger.error("❌ OpenAI library not installed. Run: pip install openai>=1.0.0")
-            return None
+            raise ImportError("❌ CRITICAL: OpenAI library not installed. Run: pip install openai>=1.0.0")
         except Exception as e:
-            logger.error(f"❌ ChatGPT analysis failed: {e}")
-            logger.info("📄 XML analysis available for manual review")
-            return None
+            raise RuntimeError(f"❌ CRITICAL: ChatGPT analysis failed: {e}")
     
     def _create_analysis_prompt(self, exploration_results: Dict[str, Any]) -> str:
         """Create a comprehensive prompt for ChatGPT analysis focused on integration test generation."""
@@ -887,31 +914,19 @@ class SessionManager:
         
         try:
             with open(prompt_file, 'r', encoding='utf-8') as f:
-                return f.read()
+                content = f.read()
+                
+                # Validate that the template contains the XML placeholder
+                if "[XML_REPORT_PLACEHOLDER]" not in content:
+                    raise ValueError(f"Prompt template missing required XML placeholder: {prompt_file}")
+                
+                return content
         except FileNotFoundError:
-            logger.warning(f"⚠️ Prompt template not found at {prompt_file}, using fallback")
-            return self._get_fallback_prompt()
+            raise FileNotFoundError(f"❌ CRITICAL: Prompt template not found at {prompt_file}. XML analysis cannot proceed without proper prompt template.")
         except Exception as e:
-            logger.error(f"❌ Error loading prompt template: {e}")
-            return self._get_fallback_prompt()
+            raise RuntimeError(f"❌ CRITICAL: Failed to load prompt template from {prompt_file}: {e}")
     
-    def _get_fallback_prompt(self) -> str:
-        """Fallback prompt if template file is not available."""
-        return """You are an expert QA automation engineer analyzing a web application testing session.
 
-TESTING SESSION DATA:
-- Website: {base_url}
-- Application Type: {application_type}
-- Total Actions: {total_actions}
-- Success Rate: {success_rate}
-- Duration: {duration} seconds
-- Pages Visited: {pages_visited}
-- Errors Found: {errors_found}
-- Typos Found: {typos_found} (High Confidence: {confirmed_typos})
-
-Please analyze this testing session and provide integration test scenarios that can be automated.
-Focus on user journeys, modal interactions, form workflows, and navigation patterns.
-Provide actionable test scenarios with specific selectors, assertions, and timing requirements."""
     
     def _load_system_prompt(self) -> str:
         """Load the ChatGPT system prompt from file."""
@@ -919,17 +934,19 @@ Provide actionable test scenarios with specific selectors, assertions, and timin
         
         try:
             with open(system_prompt_file, 'r', encoding='utf-8') as f:
-                return f.read().strip()
+                content = f.read().strip()
+                
+                # Validate that system prompt is not empty
+                if not content:
+                    raise ValueError(f"System prompt file is empty: {system_prompt_file}")
+                
+                return content
         except FileNotFoundError:
-            logger.warning(f"⚠️ System prompt not found at {system_prompt_file}, using fallback")
-            return self._get_fallback_system_prompt()
+            raise FileNotFoundError(f"❌ CRITICAL: System prompt not found at {system_prompt_file}. XML analysis cannot proceed without proper system prompt.")
         except Exception as e:
-            logger.error(f"❌ Error loading system prompt: {e}")
-            return self._get_fallback_system_prompt()
+            raise RuntimeError(f"❌ CRITICAL: Failed to load system prompt from {system_prompt_file}: {e}")
     
-    def _get_fallback_system_prompt(self) -> str:
-        """Fallback system prompt if template file is not available."""
-        return "You are an expert QA automation engineer specializing in integration test generation for web applications. Your primary goal is to analyze automated testing sessions and generate comprehensive, automatable test scenarios. Focus on user journey mapping, modal interactions, form workflows, navigation patterns, and creating structured test cases that can be easily converted into automated tests using frameworks like Playwright or Selenium. Provide actionable test scenarios with specific selectors, assertions, and timing requirements."
+
     
     async def _save_chatgpt_analysis(self, chatgpt_response: str, exploration_results: Dict[str, Any]) -> list[str]:
         """Save ChatGPT analysis in multiple formats."""
