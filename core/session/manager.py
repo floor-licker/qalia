@@ -1113,8 +1113,7 @@ The following words need human judgment:
         state_fingerprint_file = self.session_dir / "reports" / f"state_fingerprint_{self.domain}.xml"
         
         if not state_fingerprint_file.exists():
-            logger.debug(f"State fingerprint XML not found: {state_fingerprint_file}")
-            return None
+            raise FileNotFoundError(f"❌ CRITICAL: State fingerprint XML file not found: {state_fingerprint_file}. State fingerprinting must complete successfully.")
         
         try:
             with open(state_fingerprint_file, 'r', encoding='utf-8') as f:
@@ -1135,12 +1134,13 @@ The following words need human judgment:
                     logger.debug(f"State fingerprint XML has only {total_states} states - not valuable enough for inclusion")
                     return None
             else:
-                logger.warning(f"State fingerprint XML has unexpected root element: {root.tag}")
-                return None
+                raise ValueError(f"❌ CRITICAL: State fingerprint XML has unexpected root element: {root.tag}. Expected 'ApplicationStateFingerprint'.")
                 
+        except ValueError as e:
+            # Re-raise ValueError as-is (from wrong root element check)
+            raise e
         except Exception as e:
-            logger.warning(f"Failed to parse state fingerprint XML: {e}")
-            return None
+            raise RuntimeError(f"❌ CRITICAL: Failed to parse state fingerprint XML: {e}")
     
     def _combine_xml_files(self, action_xml: str, state_xml: str) -> str:
         """
@@ -1182,5 +1182,4 @@ The following words need human judgment:
             
         except Exception as e:
             logger.error(f"Failed to combine XML files: {e}")
-            # Fall back to action XML only if combination fails
             raise RuntimeError(f"❌ CRITICAL: Failed to combine XML files: {e}") 
