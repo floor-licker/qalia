@@ -194,7 +194,7 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                               capture_output=True, text=True, timeout=180)
         if result.returncode != 0:
             raise RuntimeError(f"❌ CRITICAL: Playwright browser installation failed: {result.stderr}")
-        logger.info("Playwright chromium installed successfully")
+            logger.info("Playwright chromium installed successfully")
             
     except Exception as e:
         raise RuntimeError(f"❌ CRITICAL: Browser setup failed: {e}. Cannot proceed with analysis without browsers.")

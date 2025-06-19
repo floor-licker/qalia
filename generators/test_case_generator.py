@@ -134,6 +134,7 @@ class TestCaseGenerator:
             List of test suites containing generated test cases
         """
         logger.info("🔍 Analyzing session data for test case generation...")
+        logger.info(f"🧪 POST-EXPLORATION: Test generation starting with {len(self.executed_actions)} captured actions from exploration phase")
         
         # Extract user journeys from actions
         self.user_journeys = self._extract_user_journeys()
@@ -437,7 +438,7 @@ class TestCaseGenerator:
     def _get_journey_priority(self, journey_name: str) -> TestPriority:
         """Determine generic test priority - let LLM assess actual importance."""
         # All journeys get medium priority - let LLM determine actual importance
-        return TestPriority.MEDIUM
+            return TestPriority.MEDIUM
     
     def _categorize_workflow(self, journey_name: str) -> str:
         """Categorize workflow generically - let LLM determine specific purpose."""

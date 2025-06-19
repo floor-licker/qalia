@@ -549,6 +549,7 @@ class CleanWebExplorer:
     
     async def _save_session(self, results: Dict[str, Any]) -> None:
         """Save session results and generate reports."""
+        logger.info(f"📊 POST-EXPLORATION: Starting session save with {results['exploration_summary']['total_actions_performed']} actions from {results['exploration_summary']['pages_visited']} pages")
         try:
             # Generate XML sitemap for ChatGPT
             xml_sitemap = self.reporter.generate_xml_sitemap(results['detailed_results'])

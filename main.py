@@ -136,6 +136,7 @@ async def run_complete_pipeline(
     
     print(f"✅ Test generation completed successfully!")
     print(f"📁 Tests saved to: {output_dir}")
+    logger.info(f"🏁 POST-EXPLORATION: Complete pipeline finished - generated {summary['generation_summary']['total_test_cases']} test cases across {len(frameworks)} frameworks")
     
     return {
         'status': 'success',
