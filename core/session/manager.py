@@ -205,17 +205,23 @@ class SessionManager:
             f.write(analysis_xml)
         logger.info(f"🤖 ChatGPT analysis XML saved: {analysis_xml_path}")
         
-        # Automatically send to ChatGPT for analysis - FAIL FAST if any issues
+        # Attempt ChatGPT analysis with graceful degradation
         try:
             chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
             report['chatgpt_analysis'] = {
                 'status': 'completed',
                 'analysis_file': str(chatgpt_analysis_file)
             }
+            logger.info(f"✅ ChatGPT analysis completed successfully")
         except Exception as e:
-            logger.error(f"❌ CRITICAL: XML analysis pipeline failed: {e}")
-            # Re-raise the exception - we should not continue with incomplete analysis
-            raise RuntimeError(f"❌ CRITICAL: Session report generation failed due to XML analysis failure: {e}") from e
+            logger.error(f"⚠️ ChatGPT analysis failed: {e}")
+            # Store the failure but continue with session reporting
+            report['chatgpt_analysis'] = {
+                'status': 'failed',
+                'error': str(e),
+                'analysis_file': None
+            }
+            logger.info(f"📋 Session report will continue without ChatGPT analysis")
         
         # Re-save the report with ChatGPT analysis info
         with open(report_path, 'w', encoding='utf-8') as f:
