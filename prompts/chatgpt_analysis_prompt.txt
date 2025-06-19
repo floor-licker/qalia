@@ -15,7 +15,7 @@ TESTING SESSION DATA:
 - Typos Found: {typos_found} (High Confidence: {confirmed_typos})
 
 APPLICATION STATE FINGERPRINT (XML):
-{xml_report}
+[XML_REPORT_PLACEHOLDER]
 
 PRIMARY OBJECTIVE: Generate integration test scenarios that can be automated and provide technical insights for developers, based on the provided XML state fingerprint.
 
