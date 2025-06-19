@@ -32,6 +32,9 @@ class SessionManager:
         # Track screenshots taken
         self.screenshots_taken = []
         
+        # Store state fingerprint XML content for analysis
+        self.state_fingerprint_xml = None
+        
         logger.info(f"📁 Session directory created: {self.session_dir}")
     
     def _extract_domain(self, url: str) -> str:
@@ -120,7 +123,7 @@ class SessionManager:
     
     def save_sitemap(self, xml_content: str, domain: str) -> str:
         """
-        Save the state fingerprint XML to the session directory.
+        Save the state fingerprint XML to the session directory and store for analysis.
         
         Args:
             xml_content: XML content to save
@@ -129,6 +132,9 @@ class SessionManager:
         Returns:
             Path to saved file
         """
+        # Store the XML content for later use in analysis
+        self.state_fingerprint_xml = xml_content
+        
         filename = f"state_fingerprint_{domain}.xml"
         filepath = self.session_dir / "reports" / filename
         
@@ -744,7 +750,7 @@ class SessionManager:
                 raise RuntimeError("❌ CRITICAL: Prompt template is missing XML placeholder. Analysis would be incomplete.")
             
             # Check if we should include state fingerprint XML (if it has > 1 state)
-            state_fingerprint_xml = self._load_state_fingerprint_xml_if_valuable()
+            state_fingerprint_xml = self._get_state_fingerprint_xml_if_valuable()
             
             if state_fingerprint_xml:
                 # Combine both XMLs for enhanced analysis
@@ -1102,26 +1108,21 @@ The following words need human judgment:
         logger.warning("❌ LLM typo analysis file missing - this indicates a critical failure in typo analysis pipeline")
         return ""
     
-    def _load_state_fingerprint_xml_if_valuable(self) -> Optional[str]:
+    def _get_state_fingerprint_xml_if_valuable(self) -> Optional[str]:
         """
-        Load state fingerprint XML only if it contains valuable data (> 1 state).
+        Get stored state fingerprint XML only if it contains valuable data (> 1 state).
         
         Returns:
             State fingerprint XML content if valuable, None otherwise
         """
-        # Look for state fingerprint XML file
-        state_fingerprint_file = self.session_dir / "reports" / f"state_fingerprint_{self.domain}.xml"
-        
-        if not state_fingerprint_file.exists():
-            raise FileNotFoundError(f"❌ CRITICAL: State fingerprint XML file not found: {state_fingerprint_file}. State fingerprinting must complete successfully.")
+        # Check if state fingerprint XML was stored during save_sitemap
+        if not self.state_fingerprint_xml:
+            raise RuntimeError("❌ CRITICAL: State fingerprint XML not available. State fingerprinting must complete successfully before analysis.")
         
         try:
-            with open(state_fingerprint_file, 'r', encoding='utf-8') as f:
-                xml_content = f.read()
-            
             # Parse XML to check state count
             from xml.etree.ElementTree import fromstring
-            root = fromstring(xml_content)
+            root = fromstring(self.state_fingerprint_xml)
             
             # Check if ApplicationStateFingerprint has meaningful state data
             if root.tag == "ApplicationStateFingerprint":
@@ -1129,7 +1130,7 @@ The following words need human judgment:
                 
                 if total_states > 1:
                     logger.info(f"✅ State fingerprint XML contains {total_states} states - including for enhanced analysis")
-                    return xml_content
+                    return self.state_fingerprint_xml
                 else:
                     logger.debug(f"State fingerprint XML has only {total_states} states - not valuable enough for inclusion")
                     return None
