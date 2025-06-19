@@ -766,7 +766,7 @@ class SessionManager:
                 logger.info("🔗 Including state fingerprint XML for enhanced analysis (multiple states detected)")
             else:
                 # Use only action analysis XML
-            prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+                prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
                 logger.info("📄 Using action analysis XML only (insufficient state data for enhancement)")
             
             # Final validation - ensure XML was actually inserted
@@ -1147,7 +1147,7 @@ The following words need human judgment:
         except ValueError as e:
             # Re-raise ValueError as-is (from wrong root element check)
             raise e
-            except Exception as e:
+        except Exception as e:
             raise RuntimeError(f"❌ CRITICAL: Failed to parse state fingerprint XML: {e}")
     
     def _combine_xml_files(self, action_xml: str, state_xml: str) -> str:
