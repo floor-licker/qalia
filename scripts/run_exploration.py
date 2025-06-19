@@ -195,7 +195,7 @@ Session Output:
         print_session_summary(results)
         
         # Show how to access files
-        session_dir = results.get('session_info', {}).get('session_dir', '')
+        session_dir = results.get('session_dir', '')
         if session_dir and Path(session_dir).exists():
             print(f"\n💡 To view session files:")
             print(f"   open {session_dir}")

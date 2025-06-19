@@ -316,9 +316,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 
                 # If session_dir is None, this is a critical error - the exploration should have provided it
                 if not session_dir:
-                    # Try alternative sources once
-                    session_info = exploration_results_data.get('session_info', {})
-                    session_dir = session_info.get('session_dir')
+                    # Try alternative sources once - check exploration_results_data directly
+                    session_dir = exploration_results_data.get('session_dir')
                     
                     # If still None, this is a critical failure in the exploration pipeline
                     if not session_dir:

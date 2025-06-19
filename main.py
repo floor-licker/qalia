@@ -72,8 +72,8 @@ async def run_complete_pipeline(
     if exploration_results.get('status') != 'completed':
         raise Exception(f"Exploration failed: {exploration_results.get('error', 'Unknown error')}")
     
-    session_info = exploration_results.get('session_info', {})
-    session_dir = session_info.get('session_dir')
+    # Extract session directory directly from exploration results
+    session_dir = exploration_results.get('session_dir')
     
     print(f"✅ Exploration completed successfully!")
     print(f"📁 Session directory: {session_dir}")
