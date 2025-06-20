@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import hmac
 import hashlib
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 from github import Github
 import jwt
@@ -17,6 +17,11 @@ import subprocess
 import os
 import yaml
 import requests
+import sys
+from datetime import datetime
+
+# Add the current directory to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent))
 
 # Import QA AI functionality from the current directory
 try:
@@ -24,6 +29,7 @@ try:
     from scripts.run_exploration import run_exploration
     from generators import TestCaseGenerator
     from qalia_config import get_application_url, QaliaConfig
+    from workflow_generator import WorkflowGenerator  # Import the workflow generator
 except ImportError as e:
     logging.error(f"Failed to import QA AI modules: {e}")
     # For development/testing, we'll handle this gracefully
@@ -127,41 +133,131 @@ def get_github_client(installation_id: int) -> tuple[Github, str]:
     # Return client with installation token and the token itself
     return Github(access_token), access_token
 
-
-
 async def clone_repository(repo_url: str, branch: str = "main", access_token: str = None) -> str:
-    """Clone repository to a temporary directory and return the path."""
+    """Clone a repository to a temporary directory."""
+    import subprocess
+    
     temp_dir = tempfile.mkdtemp()
+    
     try:
-        # First try without authentication for public repos
-        logger.info(f"Attempting to clone repository: {repo_url}")
-        cmd = f"git clone --branch {branch} --depth 1 {repo_url} {temp_dir}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        # Prepare the URL with authentication if token is provided
+        if access_token:
+            # Parse the URL and inject the token
+            if repo_url.startswith("https://github.com/"):
+                auth_url = repo_url.replace("https://", f"https://x-access-token:{access_token}@")
+            else:
+                auth_url = repo_url
+        else:
+            auth_url = repo_url
         
-        # If that fails and we have an access token, try with authentication
-        if result.returncode != 0 and access_token and repo_url.startswith("https://github.com/"):
-            logger.info("Public clone failed, trying with authentication...")
-            # Clean up first attempt
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            temp_dir = tempfile.mkdtemp()
-            
-            # Convert to authenticated URL
-            auth_repo_url = repo_url.replace("https://github.com/", f"https://x-access-token:{access_token}@github.com/")
-            cmd = f"git clone --branch {branch} --depth 1 {auth_repo_url} {temp_dir}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        # Clone the repository
+        result = subprocess.run(
+            ["git", "clone", "-b", branch, auth_url, temp_dir],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
         
         if result.returncode != 0:
             logger.error(f"Failed to clone repository: {result.stderr}")
-            logger.error(f"Git command output: {result.stdout}")
-            shutil.rmtree(temp_dir, ignore_errors=True)
             return None
         
-        logger.info(f"Repository cloned successfully to {temp_dir}")
+        logger.info(f"Repository cloned successfully to: {temp_dir}")
         return temp_dir
+    
     except Exception as e:
-        logger.error(f"Error cloning repository: {e}")
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        logger.error(f"Exception during repository cloning: {e}")
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
         return None
+
+async def commit_tests_and_workflows(
+    repo_path: str, 
+    test_results_dir: str, 
+    frameworks: list,
+    access_token: str,
+    branch: str = "main"
+) -> bool:
+    """
+    Commit generated tests and workflows to the repository.
+    
+    Args:
+        repo_path: Local path to the cloned repository
+        test_results_dir: Path to generated test files (relative to repo)
+        frameworks: List of frameworks that have tests
+        access_token: GitHub access token for authentication
+        branch: Branch to commit to
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    import subprocess
+    
+    try:
+        repo_path = Path(repo_path)
+        
+        # Copy generated tests to repository
+        source_tests = Path(test_results_dir)
+        target_tests = repo_path / "qalia-tests"
+        
+        if source_tests.exists():
+            if target_tests.exists():
+                shutil.rmtree(target_tests)
+            shutil.copytree(source_tests, target_tests)
+            logger.info(f"Copied generated tests to {target_tests}")
+        
+        # Generate GitHub Actions workflows
+        generator = WorkflowGenerator(str(repo_path))
+        workflows = generator.generate_test_workflows(frameworks, "qalia-tests")
+        matrix_workflow = generator.create_test_integration_workflow("qalia-tests")
+        workflows.append(matrix_workflow)
+        
+        logger.info(f"Generated {len(workflows)} workflow files")
+        
+        # Configure git user (required for commits)
+        subprocess.run(["git", "config", "user.name", "Qalia AI"], 
+                      cwd=repo_path, check=True)
+        subprocess.run(["git", "config", "user.email", "qalia@ai-generated.com"], 
+                      cwd=repo_path, check=True)
+        
+        # Check if there are any changes to commit
+        status_result = subprocess.run(["git", "status", "--porcelain"], 
+                                     cwd=repo_path, capture_output=True, text=True)
+        
+        if not status_result.stdout.strip():
+            logger.info("No changes to commit - tests and workflows are up to date")
+            return True
+        
+        # Add all changes
+        subprocess.run(["git", "add", "qalia-tests/", ".github/workflows/qalia-*.yml"], 
+                      cwd=repo_path, check=True)
+        
+        # Create commit message
+        commit_message = f"""🤖 Add Qalia generated tests and workflows
+
+- Generated test files for {', '.join(frameworks)} frameworks
+- Added GitHub Actions workflows for automated testing
+- Tests can be run individually or as a complete suite
+
+Generated by Qalia.ai on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
+        
+        # Commit changes
+        subprocess.run(["git", "commit", "-m", commit_message], 
+                      cwd=repo_path, check=True)
+        
+        # Push to remote
+        subprocess.run(["git", "push", "origin", branch], 
+                      cwd=repo_path, check=True)
+        
+        logger.info("Successfully committed and pushed generated tests and workflows")
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Git operation failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to commit tests and workflows: {e}")
+        return False
 
 async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str = None) -> Dict[str, Any]:
     """Run QA AI analysis on a deployed application."""
@@ -256,7 +352,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 
                 generation_options = {
                     "frameworks": generation_config.get("frameworks", ["playwright", "cypress", "jest"]),
-                    "output_dir": temp_dir
+                    "output_dir": temp_dir,
+                    "run_tests": True  # Enable test execution to validate generated tests
                 }
             else:
                 # Default options
@@ -271,7 +368,8 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 
                 generation_options = {
                     "frameworks": ["playwright", "cypress", "jest"],
-                    "output_dir": temp_dir
+                    "output_dir": temp_dir,
+                    "run_tests": True  # Enable test execution to validate generated tests
                 }
             
             # Run browser-based testing - FAIL if it doesn't work (no fallbacks!)
@@ -281,17 +379,94 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                 generation_options
             )
             
+            # Commit generated tests and workflows to repository
+            test_execution_results = results.get("test_execution_results", {})
+            test_generation_results = results.get("test_generation_results", {})
+            
+            if test_generation_results and repo_path:
+                try:
+                    logger.info("🚀 Committing generated tests and workflows to repository...")
+                    
+                    # Get the frameworks that had tests generated
+                    generated_files = test_generation_results.get("generated_files", {})
+                    available_frameworks = [fw for fw, files in generated_files.items() if files]
+                    
+                    if available_frameworks:
+                        # Get access token from GitHub client setup
+                        installation_id = int(os.getenv("GITHUB_INSTALLATION_ID", "0"))
+                        if installation_id > 0:
+                            _, access_token = get_github_client(installation_id)
+                            
+                            # Commit tests and workflows
+                            commit_success = await commit_tests_and_workflows(
+                                repo_path=repo_path,
+                                test_results_dir=test_generation_results.get("output_directory", temp_dir),
+                                frameworks=available_frameworks,
+                                access_token=access_token,
+                                branch=branch
+                            )
+                            
+                            if commit_success:
+                                logger.info("✅ Successfully committed tests and workflows")
+                                
+                                # Trigger workflows immediately using repository dispatch
+                                logger.info("🚀 Triggering test workflows for immediate execution...")
+                                
+                                # Get commit SHA for the committed changes
+                                import subprocess
+                                try:
+                                    sha_result = subprocess.run(["git", "rev-parse", "HEAD"], 
+                                                               cwd=repo_path, capture_output=True, text=True)
+                                    commit_sha = sha_result.stdout.strip() if sha_result.returncode == 0 else None
+                                except:
+                                    commit_sha = None
+                                
+                                if commit_sha:
+                                    # Get GitHub client for triggering workflows
+                                    g, _ = get_github_client(installation_id)
+                                    repo_name = f"{os.getenv('GITHUB_REPOSITORY_OWNER', '')}/{os.getenv('GITHUB_REPOSITORY_NAME', '')}"
+                                    
+                                    # If we don't have the repo name from env, try to extract from URL
+                                    if not repo_name or repo_name == "/":
+                                        if "github.com/" in repo_url:
+                                            repo_name = repo_url.split("github.com/")[-1].replace(".git", "")
+                                    
+                                    trigger_success = await trigger_test_workflows(
+                                        g, repo_name, branch, available_frameworks, commit_sha
+                                    )
+                                    
+                                    if trigger_success:
+                                        logger.info("✅ Test workflows triggered - individual checks will appear shortly!")
+                                    else:
+                                        logger.warning("⚠️ Failed to trigger workflows - they will run on next commit")
+                                else:
+                                    logger.warning("⚠️ Could not get commit SHA - workflows will run on next commit")
+                            else:
+                                logger.warning("⚠️ Failed to commit tests and workflows - manual integration required")
+                        else:
+                            logger.warning("⚠️ No GitHub installation ID found - skipping workflow generation")
+                    else:
+                        logger.info("ℹ️ No test files generated - skipping workflow creation")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to commit tests and workflows: {e}")
+                    # Don't fail the entire analysis if workflow generation fails
+            else:
+                logger.info("ℹ️ Skipping workflow generation - no repository path or test results")
+            
             # Process results
             analysis_summary = {
                 "status": "completed",
                 "app_url": app_url,
                 "exploration_results": results.get("exploration_results", {}),
                 "test_generation_results": results.get("test_generation_results", {}),
+                "test_execution_results": results.get("test_execution_results", {}),  # Add test execution results
                 "session_directory": results.get("session_directory"),
                 "total_test_cases": 0,
                 "issues_found": 0,
                 "recommendations": [],
                 "config_used": "qalia.yml" if config else "environment_variables",
+                "workflows_committed": repo_path is not None,  # Indicate if workflows were created
                 "chatgpt_analysis": {
                     "status": "unknown",
                     "error": None
@@ -393,6 +568,10 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
         chatgpt_status = analysis_results.get("chatgpt_analysis", {}).get("status", "unknown")
         chatgpt_error = analysis_results.get("chatgpt_analysis", {}).get("error", None)
         
+        # Check test execution results
+        test_execution = analysis_results.get("test_execution_results", {})
+        execution_summary = test_execution.get("execution_summary", {})
+        
         summary = f"""
 ## 🤖 Qalia.ai Analysis Results
 
@@ -402,6 +581,20 @@ async def create_check_run(g: Github, repo_name: str, commit_sha: str, analysis_
 - **Test Cases Generated:** {analysis_results['total_test_cases']}
 - **Issues Found:** {analysis_results['issues_found']}
 - **Status:** ✅ Analysis completed successfully"""
+
+        # Add test execution information
+        if test_execution and execution_summary:
+            successful_frameworks = execution_summary.get('successful_frameworks', 0)
+            total_frameworks = execution_summary.get('total_frameworks_tested', 0)
+            if total_frameworks > 0:
+                summary += f"""
+- **Test Validation:** ✅ {successful_frameworks}/{total_frameworks} frameworks passed execution"""
+            else:
+                summary += """
+- **Test Validation:** ⚠️ Tests not executed"""
+        else:
+            summary += """
+- **Test Validation:** ⚠️ Tests not executed"""
 
         # Add ChatGPT analysis information
         if chatgpt_status == "completed":
@@ -425,12 +618,54 @@ Qalia.ai has automatically generated comprehensive test suites for your applicat
 - User interface interactions
 - Navigation flows
 - Form submissions
-- Error handling scenarios
+- Error handling scenarios"""
 
-### 🚀 Next Steps
+        # Add workflow information
+        if analysis_results.get("workflows_committed", False):
+            summary += """
+
+### 🚀 GitHub Actions Integration
+✅ **Individual test workflows have been created!** 
+
+The following GitHub Actions workflows will run automatically:
+- 🎭 **Qalia Playwright Tests** - End-to-end browser testing
+- 🌲 **Qalia Cypress Tests** - Interactive UI testing  
+- 🃏 **Qalia Jest Tests** - Unit and integration testing
+- 🤖 **Qalia Generated Tests** - Combined test matrix
+
+These will appear as separate checks on future PRs and commits."""
+
+        # Add test execution details if available
+        if test_execution and execution_summary.get('total_frameworks_tested', 0) > 0:
+            framework_results = test_execution.get('framework_results', {})
+            summary += """
+
+### 🏃 Test Execution Results"""
+            for framework, result in framework_results.items():
+                status_icon = "✅" if result.get('success', False) else "❌"
+                passed = result.get('passed_tests', 0)
+                failed = result.get('failed_tests', 0)
+                exec_time = result.get('execution_time', 0)
+                summary += f"""
+- **{framework.title()}:** {status_icon} {passed} passed, {failed} failed ({exec_time:.1f}s)"""
+
+        summary += """
+
+### 🚀 Next Steps"""
+        
+        if analysis_results.get("workflows_committed", False):
+            summary += """
+1. ✅ **Tests are ready!** Individual test workflows have been added to your repository
+2. 🔄 **Automatic testing** will start on your next commit or PR
+3. 📊 **Monitor results** in the "Checks" tab of future PRs
+4. 🔧 **Customize tests** by editing files in the `qalia-tests/` directory"""
+        else:
+            summary += """
 1. Download the generated test files from the workflow artifacts
 2. Integrate the tests into your CI/CD pipeline
-3. Review and customize the tests as needed
+3. Review and customize the tests as needed"""
+        
+        summary += """
         """
     else:
         conclusion = "failure"
@@ -795,6 +1030,71 @@ async def handle_push(payload: Dict[str, Any]):
     
     # Create check run
     await create_check_run(g, repo_name, commit_sha, analysis_results)
+
+async def trigger_test_workflows(
+    g: Github, 
+    repo_name: str, 
+    branch: str, 
+    frameworks: list,
+    commit_sha: str
+) -> bool:
+    """
+    Trigger the generated test workflows immediately using repository dispatch.
+    
+    Args:
+        g: GitHub client
+        repo_name: Repository name (owner/repo)
+        branch: Branch to run tests on
+        frameworks: List of frameworks to test
+        commit_sha: The commit SHA to test against
+        
+    Returns:
+        True if workflows were triggered successfully
+    """
+    try:
+        repo = g.get_repo(repo_name)
+        
+        # Trigger each framework workflow
+        for framework in frameworks:
+            workflow_name = f"qalia-{framework}-tests.yml"
+            
+            try:
+                # Use repository dispatch to trigger workflow
+                repo.create_repository_dispatch(
+                    event_type=f"qalia-test-{framework}",
+                    client_payload={
+                        "framework": framework,
+                        "commit_sha": commit_sha,
+                        "branch": branch,
+                        "triggered_by": "qalia_analysis"
+                    }
+                )
+                logger.info(f"✅ Triggered {framework} test workflow")
+                
+            except Exception as e:
+                logger.error(f"Failed to trigger {framework} workflow: {e}")
+        
+        # Also trigger the matrix workflow
+        try:
+            repo.create_repository_dispatch(
+                event_type="qalia-test-matrix",
+                client_payload={
+                    "frameworks": frameworks,
+                    "commit_sha": commit_sha,
+                    "branch": branch,
+                    "triggered_by": "qalia_analysis"
+                }
+            )
+            logger.info("✅ Triggered matrix test workflow")
+            
+        except Exception as e:
+            logger.error(f"Failed to trigger matrix workflow: {e}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to trigger test workflows: {e}")
+        return False
 
 if __name__ == "__main__":
     import uvicorn
