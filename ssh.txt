@@ -1,0 +1,1 @@
+ssh -i ~/.ssh/qalia_deploy root@157.245.241.244 

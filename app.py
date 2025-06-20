@@ -7,6 +7,7 @@ import asyncio
 import logging
 import subprocess  # Move subprocess import to top level
 import time  # Add missing time import
+import yaml  # Add missing yaml import
 from pathlib import Path
 from typing import Dict, Any, Optional
 
