@@ -224,6 +224,42 @@ async def commit_tests_and_workflows(
             logger.info("No changes to commit - tests and workflows are up to date")
             return True
         
+        # PREVENT NODE_MODULES COMMITS: Create .gitignore in qalia-tests directory
+        qalia_tests_dir = os.path.join(repo_path, "qalia-tests")
+        if os.path.exists(qalia_tests_dir):
+            # Remove any existing node_modules from git tracking
+            try:
+                subprocess.run(["git", "rm", "-r", "--cached", "qalia-tests/*/node_modules"], 
+                              cwd=repo_path, capture_output=True)
+                logger.info("Removed node_modules directories from git tracking")
+            except subprocess.CalledProcessError:
+                # node_modules might not exist in git yet, which is fine
+                pass
+            
+            gitignore_path = os.path.join(qalia_tests_dir, ".gitignore")
+            gitignore_content = """# Node.js dependencies - should not be committed
+node_modules/
+*/node_modules/
+package-lock.json
+*/package-lock.json
+
+# Test results and artifacts
+test-results/
+*/test-results/
+playwright-report/
+*/playwright-report/
+coverage/
+*/coverage/
+
+# Temporary files
+*.log
+.DS_Store
+.env
+"""
+            with open(gitignore_path, 'w', encoding='utf-8') as f:
+                f.write(gitignore_content)
+            logger.info("Created .gitignore in qalia-tests directory to prevent node_modules commits")
+        
         # Add all changes
         subprocess.run(["git", "add", "qalia-tests/", ".github/workflows/qalia-*.yml"], 
                       cwd=repo_path, check=True)
