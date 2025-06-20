@@ -6,6 +6,7 @@ import tempfile
 import asyncio
 import logging
 import subprocess  # Move subprocess import to top level
+import time  # Add missing time import
 from pathlib import Path
 from typing import Dict, Any, Optional
 
