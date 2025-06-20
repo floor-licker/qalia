@@ -254,52 +254,204 @@ def print_pipeline_summary(results: Dict[str, Any]):
 
 async def run_generated_tests(output_dir: Path, frameworks: list = None) -> Dict[str, Any]:
     """
-    Execute the generated tests and return results.
+    Execute generated tests to validate they work correctly.
     
     Args:
         output_dir: Directory containing generated test files
-        frameworks: List of frameworks to run tests for
+        frameworks: List of frameworks to test (default: ['playwright'])
         
     Returns:
-        Dictionary containing test execution results
+        Test execution results including pass/fail counts and timing
     """
     if frameworks is None:
-        frameworks = ['playwright']  # Default to Playwright for fastest execution
+        frameworks = ['playwright']  # Default to Playwright for faster execution
     
-    test_results = {
-        'execution_summary': {
-            'total_frameworks_tested': 0,
-            'successful_frameworks': 0,
-            'failed_frameworks': 0,
-            'total_test_files_executed': 0,
-            'execution_timestamp': time.time()
-        },
-        'framework_results': {}
+    logger.info(f"🚀 Executing generated tests for frameworks: {frameworks}")
+    start_time = time.time()
+    
+    results = {
+        'frameworks_tested': frameworks,
+        'execution_summary': {},
+        'total_passed': 0,
+        'total_failed': 0,
+        'total_duration': 0,
+        'status': 'success'
     }
-    
-    logger.info(f"🧪 POST-GENERATION: Starting test execution for {len(frameworks)} frameworks")
     
     for framework in frameworks:
         framework_dir = output_dir / framework
         if not framework_dir.exists():
             logger.warning(f"Framework directory not found: {framework_dir}")
             continue
+        
+        logger.info(f"Running {framework} tests...")
+        framework_results = await _run_framework_tests(framework, framework_dir)
+        results['execution_summary'][framework] = framework_results
+        
+        # Update totals
+        results['total_passed'] += framework_results.get('passed', 0)
+        results['total_failed'] += framework_results.get('failed', 0)
+    
+    results['total_duration'] = time.time() - start_time
+    
+    if results['total_failed'] > 0:
+        results['status'] = 'partial_failure'
+    
+    logger.info(f"✅ Test execution completed: {results['total_passed']} passed, {results['total_failed']} failed in {results['total_duration']:.1f}s")
+    
+    return results
+
+
+async def analyze_web_app(repo_path: str, installation_id: int = None) -> Dict[str, Any]:
+    """
+    Analyze a web application repository and generate tests.
+    
+    This is the main entry point used by the GitHub integration (app.py).
+    It runs the complete pipeline on a cloned repository.
+    
+    Args:
+        repo_path: Path to the cloned repository
+        installation_id: GitHub App installation ID (optional)
+        
+    Returns:
+        Analysis results including test frameworks and output directories
+    """
+    try:
+        logger.info(f"🔍 Starting web app analysis for repository: {repo_path}")
+        
+        # Change to the repository directory
+        original_cwd = os.getcwd()
+        os.chdir(repo_path)
+        
+        # Try to detect if this is a web application
+        web_indicators = [
+            "package.json",
+            "index.html", 
+            "app.py",
+            "requirements.txt",
+            "Dockerfile",
+            "docker-compose.yml"
+        ]
+        
+        has_web_indicators = any(
+            os.path.exists(os.path.join(repo_path, indicator)) 
+            for indicator in web_indicators
+        )
+        
+        if not has_web_indicators:
+            logger.warning("No clear web application indicators found, proceeding anyway...")
+        
+        # Determine base URL - try to find a running service or use localhost
+        base_url = "http://localhost:3000"  # Default assumption
+        
+        # Check for common port configurations
+        if os.path.exists("package.json"):
+            try:
+                with open("package.json", 'r') as f:
+                    package_data = json.load(f)
+                    scripts = package_data.get("scripts", {})
+                    # Look for common development server patterns
+                    if "dev" in scripts or "start" in scripts:
+                        base_url = "http://localhost:3000"  # React/Next.js default
+            except:
+                pass
+        
+        # Set up output directory in the repository
+        output_dir = Path(repo_path) / "qalia-tests"
+        output_dir.mkdir(exist_ok=True)
+        
+        logger.info(f"🎯 Analyzing web app at {base_url}")
+        logger.info(f"📁 Output directory: {output_dir}")
+        
+        # Run the complete pipeline
+        try:
+            # For GitHub integration, we'll run a simplified analysis
+            # since we can't assume the web app is running
             
-        logger.info(f"🎯 Executing {framework} tests in {framework_dir}")
-        framework_result = await _run_framework_tests(framework, framework_dir)
-        
-        test_results['framework_results'][framework] = framework_result
-        test_results['execution_summary']['total_frameworks_tested'] += 1
-        test_results['execution_summary']['total_test_files_executed'] += framework_result.get('test_files_count', 0)
-        
-        if framework_result.get('success', False):
-            test_results['execution_summary']['successful_frameworks'] += 1
-        else:
-            test_results['execution_summary']['failed_frameworks'] += 1
+            # Generate basic test structure based on repository analysis
+            frameworks = ['playwright', 'cypress', 'jest']  # Support all frameworks
+            
+            # Create test generator with minimal session data for repository-based analysis
+            # Since we don't have actual exploration data, create a minimal structure
+            minimal_session_data = {
+                'repository_path': repo_path,
+                'analysis_type': 'repository_based',
+                'installation_id': installation_id,
+                'exploration_summary': {
+                    'pages_visited': 1,
+                    'total_actions_performed': 0,
+                    'errors_found': 0
+                },
+                'detailed_results': {
+                    'executed_actions': []  # Empty since we haven't run exploration
+                }
+            }
+            
+            generator = TestCaseGenerator(base_url, minimal_session_data)
+            
+            # Generate test cases (will create basic tests due to empty actions)
+            test_suites = generator.generate_test_cases()
+            
+            # Export tests to all frameworks
+            generated_files = {}
+            for framework in frameworks:
+                framework_dir = output_dir / framework
+                if framework == 'playwright':
+                    generated_files[framework] = generator.export_playwright_tests(framework_dir)
+                elif framework == 'cypress':
+                    generated_files[framework] = generator.export_cypress_tests(framework_dir)
+                elif framework == 'jest':
+                    generated_files[framework] = generator.export_jest_tests(framework_dir)
+            
+            # Generate summary
+            summary = generator.generate_summary_report()
+            
+            # Save summary
+            summary_path = output_dir / "analysis_summary.json"
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2, default=str)
+            
+            logger.info(f"✅ Analysis completed successfully!")
+            logger.info(f"📊 Generated {summary.get('generation_summary', {}).get('total_test_cases', 0)} test cases")
+            
+            return {
+                'status': 'success',
+                'test_frameworks': frameworks,
+                'test_results_dir': str(output_dir),
+                'generated_files': generated_files,
+                'summary': summary,
+                'repository_path': repo_path,
+                'base_url': base_url,
+                'installation_id': installation_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Pipeline execution failed: {e}")
+            # Return basic structure even if pipeline fails
+            return {
+                'status': 'partial_success',
+                'test_frameworks': ['playwright'],  # At least try Playwright
+                'test_results_dir': str(output_dir),
+                'error': str(e),
+                'repository_path': repo_path,
+                'installation_id': installation_id
+            }
     
-    logger.info(f"✅ POST-GENERATION: Test execution complete - {test_results['execution_summary']['successful_frameworks']}/{test_results['execution_summary']['total_frameworks_tested']} frameworks passed")
+    except Exception as e:
+        logger.error(f"❌ Web app analysis failed: {e}")
+        return {
+            'status': 'failed',
+            'error': str(e),
+            'repository_path': repo_path,
+            'installation_id': installation_id
+        }
     
-    return test_results
+    finally:
+        # Restore original working directory
+        try:
+            os.chdir(original_cwd)
+        except:
+            pass
 
 
 async def _run_framework_tests(framework: str, framework_dir: Path) -> Dict[str, Any]:
