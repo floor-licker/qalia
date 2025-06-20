@@ -61,10 +61,20 @@ class WorkflowGenerator:
                     "types": ["qalia-test-playwright"]
                 },
                 "pull_request": {
-                    "branches": ["main", "master", "develop"]
+                    "branches": ["main", "master", "develop"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "push": {
-                    "branches": ["main", "master"]
+                    "branches": ["main", "master"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "workflow_dispatch": None
             },
@@ -72,6 +82,8 @@ class WorkflowGenerator:
                 "playwright-tests": {
                     "name": "Run Playwright Tests",
                     "runs-on": "ubuntu-latest",
+                    # INFINITE LOOP PREVENTION: Skip if commit is from Qalia
+                    "if": "!contains(github.event.head_commit.message, '🤖 Add Qalia generated tests and workflows') && !contains(github.event.head_commit.author.name, 'Qalia AI')",
                     "steps": [
                         {
                             "name": "Checkout code",
@@ -148,10 +160,20 @@ class WorkflowGenerator:
                     "types": ["qalia-test-cypress"]
                 },
                 "pull_request": {
-                    "branches": ["main", "master", "develop"]
+                    "branches": ["main", "master", "develop"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "push": {
-                    "branches": ["main", "master"]
+                    "branches": ["main", "master"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "workflow_dispatch": None
             },
@@ -159,6 +181,8 @@ class WorkflowGenerator:
                 "cypress-tests": {
                     "name": "Run Cypress Tests",
                     "runs-on": "ubuntu-latest",
+                    # INFINITE LOOP PREVENTION: Skip if commit is from Qalia
+                    "if": "!contains(github.event.head_commit.message, '🤖 Add Qalia generated tests and workflows') && !contains(github.event.head_commit.author.name, 'Qalia AI')",
                     "steps": [
                         {
                             "name": "Checkout code",
@@ -238,10 +262,20 @@ class WorkflowGenerator:
                     "types": ["qalia-test-jest"]
                 },
                 "pull_request": {
-                    "branches": ["main", "master", "develop"]
+                    "branches": ["main", "master", "develop"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "push": {
-                    "branches": ["main", "master"]
+                    "branches": ["main", "master"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "workflow_dispatch": None
             },
@@ -249,6 +283,8 @@ class WorkflowGenerator:
                 "jest-tests": {
                     "name": "Run Jest Tests",
                     "runs-on": "ubuntu-latest",
+                    # INFINITE LOOP PREVENTION: Skip if commit is from Qalia
+                    "if": "!contains(github.event.head_commit.message, '🤖 Add Qalia generated tests and workflows') && !contains(github.event.head_commit.author.name, 'Qalia AI')",
                     "steps": [
                         {
                             "name": "Checkout code", 
@@ -328,10 +364,20 @@ class WorkflowGenerator:
                     "types": ["qalia-test-matrix"]
                 },
                 "pull_request": {
-                    "branches": ["main", "master", "develop"]
+                    "branches": ["main", "master", "develop"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "push": {
-                    "branches": ["main", "master"]
+                    "branches": ["main", "master"],
+                    # INFINITE LOOP PREVENTION: Don't trigger on Qalia-only changes
+                    "paths-ignore": [
+                        "qalia-tests/**",
+                        ".github/workflows/qalia-*.yml"
+                    ]
                 },
                 "workflow_dispatch": None
             },
@@ -339,6 +385,8 @@ class WorkflowGenerator:
                 "test-matrix": {
                     "name": "Test ${{ matrix.framework }}",
                     "runs-on": "ubuntu-latest",
+                    # INFINITE LOOP PREVENTION: Skip if commit is from Qalia
+                    "if": "!contains(github.event.head_commit.message, '🤖 Add Qalia generated tests and workflows') && !contains(github.event.head_commit.author.name, 'Qalia AI')",
                     "strategy": {
                         "fail-fast": False,
                         "matrix": {
