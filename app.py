@@ -1,23 +1,22 @@
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+import os
+import sys
+import json
+import shutil
+import tempfile
+import asyncio
+import logging
+import subprocess  # Move subprocess import to top level
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+
 import hmac
 import hashlib
-import os
-from typing import Dict, Any, Optional
-import json
 from github import Github
 import jwt
-import time
-import asyncio
-import tempfile
-import shutil
-from pathlib import Path
-import logging
-import subprocess
-import os
-import yaml
 import requests
-import sys
 from datetime import datetime
 
 # Add the current directory to Python path for imports
@@ -109,7 +108,6 @@ def get_github_client(installation_id: int) -> tuple[Github, str]:
     )
     
     # Get installation access token using direct API call
-    import requests
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Accept": "application/vnd.github.v3+json",
@@ -135,8 +133,6 @@ def get_github_client(installation_id: int) -> tuple[Github, str]:
 
 async def clone_repository(repo_url: str, branch: str = "main", access_token: str = None) -> str:
     """Clone a repository to a temporary directory."""
-    import subprocess
-    
     temp_dir = tempfile.mkdtemp()
     
     try:
@@ -191,8 +187,6 @@ async def commit_tests_and_workflows(
     Returns:
         True if successful, False otherwise
     """
-    import subprocess
-    
     try:
         repo_path = Path(repo_path)
         
@@ -413,7 +407,6 @@ async def run_qalia_analysis(repo_url: str, branch: str = "main", repo_path: str
                                 logger.info("🚀 Triggering test workflows for immediate execution...")
                                 
                                 # Get commit SHA for the committed changes
-                                import subprocess
                                 try:
                                     sha_result = subprocess.run(["git", "rev-parse", "HEAD"], 
                                                                cwd=repo_path, capture_output=True, text=True)
