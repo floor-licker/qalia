@@ -179,15 +179,21 @@ class GitHubManager:
         try:
             repo_path = Path(repo_path)
             
-            # Copy generated tests to repository
+            # Copy generated tests to repository (if not already there)
             source_tests = Path(test_results_dir)
             target_tests = repo_path / "qalia-tests"
             
-            if source_tests.exists():
+            # Check if tests are already in the correct location
+            if source_tests.resolve() == target_tests.resolve():
+                logger.info(f"Tests already in correct location: {target_tests}")
+            elif source_tests.exists():
                 if target_tests.exists():
                     shutil.rmtree(target_tests)
                 shutil.copytree(source_tests, target_tests)
                 logger.info(f"Copied generated tests to {target_tests}")
+            else:
+                logger.warning(f"Source test directory not found: {source_tests}")
+                # Tests might already be in target location, continue anyway
             
             # Generate GitHub Actions workflows
             generator = WorkflowGenerator(str(repo_path))
