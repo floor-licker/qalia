@@ -1,4 +1,4 @@
-name: Deploy to DigitalOcean
+name: Deploy to AWS
 
 on:
   push:
@@ -32,16 +32,16 @@ jobs:
 
     - name: Debug secrets
       run: |
-        echo "DO_HOST exists: ${{ secrets.DO_HOST != '' }}"
-        echo "DO_USERNAME exists: ${{ secrets.DO_USERNAME != '' }}"
-        echo "DO_SSH_KEY exists: ${{ secrets.DO_SSH_KEY != '' }}"
+        echo "AWS_HOST exists: ${{ secrets.AWS_HOST != '' }}"
+        echo "AWS_USERNAME exists: ${{ secrets.AWS_USERNAME != '' }}"
+        echo "AWS_SSH_KEY exists: ${{ secrets.AWS_SSH_KEY != '' }}"
         
-    - name: Deploy to DigitalOcean
+    - name: Deploy to AWS
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.DO_HOST }}
-        username: ${{ secrets.DO_USERNAME }}
-        key: ${{ secrets.DO_SSH_KEY }}
+        host: ${{ secrets.AWS_HOST }}
+        username: ${{ secrets.AWS_USERNAME }}
+        key: ${{ secrets.AWS_SSH_KEY }}
         script: |
           # Navigate to application directory
           cd /opt/qalia || {
@@ -81,4 +81,4 @@ jobs:
       run: |
         echo "Waiting for service to start..."
         sleep 10
-        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting" 
+        curl -f http://${{ secrets.AWS_HOST }}/health || echo "Health check failed - service may still be starting" 
