@@ -86,11 +86,11 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Detailed health check."""
-        return {
-            "status": "healthy",
+    return {
+        "status": "healthy",
         "github_manager": github_manager is not None,
         "timestamp": asyncio.get_event_loop().time()
-        }
+    }
 
 
 @app.post("/webhook")
@@ -98,32 +98,32 @@ async def github_webhook(request: Request):
     """Handle GitHub webhook events."""
     try:
         # Get request body and headers
-    body = await request.body()
-    signature = request.headers.get("X-Hub-Signature-256", "")
+        body = await request.body()
+        signature = request.headers.get("X-Hub-Signature-256", "")
         event_type = request.headers.get("X-GitHub-Event", "")
-    
-    # Verify webhook signature
+        
+        # Verify webhook signature
         if not github_manager.verify_webhook_signature(body, signature):
             logger.error("❌ Invalid webhook signature")
             raise HTTPException(status_code=401, detail="Invalid signature")
-    
+        
         # Parse JSON payload
-    try:
+        try:
             payload = json.loads(body.decode('utf-8'))
         except json.JSONDecodeError as e:
             logger.error(f"❌ Invalid JSON payload: {e}")
             raise HTTPException(status_code=400, detail="Invalid JSON")
-    
+        
         logger.info(f"📥 Received {event_type} webhook event")
         
         # Route webhook events
-    if event_type == "pull_request":
-        asyncio.create_task(handle_pull_request(payload))
-    elif event_type == "push":
-        asyncio.create_task(handle_push(payload))
-    else:
+        if event_type == "pull_request":
+            asyncio.create_task(handle_pull_request(payload))
+        elif event_type == "push":
+            asyncio.create_task(handle_push(payload))
+        else:
             logger.info(f"ℹ️ Ignoring {event_type} event")
-    
+        
         return JSONResponse({"status": "received"})
         
     except HTTPException:
