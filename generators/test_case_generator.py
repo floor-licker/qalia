@@ -438,7 +438,7 @@ class TestCaseGenerator:
     def _get_journey_priority(self, journey_name: str) -> TestPriority:
         """Determine generic test priority - let LLM assess actual importance."""
         # All journeys get medium priority - let LLM determine actual importance
-        return TestPriority.MEDIUM
+            return TestPriority.MEDIUM
     
     def _categorize_workflow(self, journey_name: str) -> str:
         """Categorize workflow generically - let LLM determine specific purpose."""

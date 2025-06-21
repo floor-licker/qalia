@@ -238,11 +238,11 @@ def print_pipeline_summary(results: Dict[str, Any]):
             print(f"  2. Integrate into CI/CD pipeline")
             print(f"  3. Run locally: cd {output_dir}/playwright && npx playwright test")
         else:
-            print(f"  1. Review generated tests: ls -la {output_dir}/")
-            print(f"  2. Install dependencies:")
-            print(f"     cd {output_dir}/playwright && npm install")
-            print(f"  3. Run tests:")
-            print(f"     npx playwright test")
+        print(f"  1. Review generated tests: ls -la {output_dir}/")
+        print(f"  2. Install dependencies:")
+        print(f"     cd {output_dir}/playwright && npm install")
+        print(f"  3. Run tests:")
+        print(f"     npx playwright test")
             print(f"  4. Debug any failing tests")
     else:
         print("  1. Review exploration results in session directory")
