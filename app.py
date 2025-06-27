@@ -151,6 +151,24 @@ async def handle_pull_request(payload: Dict[str, Any]):
             logger.info("🔄 Detected Qalia-generated commit - skipping analysis to prevent infinite loop")
             return
         
+        # ADDITIONAL LOOP PREVENTION: Check if PR already contains Qalia files
+        repo_name = payload["repository"]["full_name"]
+        pr_number = payload["pull_request"]["number"]
+        
+        # If this is a synchronize event, check if it's likely our own commit
+        if action == "synchronize":
+            # Check if PR branch name suggests this is a Qalia update
+            branch_name = payload["pull_request"]["head"]["ref"]
+            if any(keyword in branch_name.lower() for keyword in ["qalia", "test", "generated"]):
+                logger.info(f"🔄 Detected likely Qalia branch update: {branch_name} - skipping to prevent loop")
+                return
+            
+            # Check PR title for Qalia signatures
+            pr_title = payload["pull_request"].get("title", "")
+            if any(sig in pr_title for sig in ["🤖", "Qalia", "generated tests", "workflows"]):
+                logger.info(f"🔄 Detected Qalia PR title: '{pr_title}' - skipping to prevent loop")
+                return
+        
         # Extract PR information
         pr_info = payload["pull_request"]
         repo_name = payload["repository"]["full_name"]
