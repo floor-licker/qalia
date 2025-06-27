@@ -101,17 +101,26 @@ class TestCaseGenerator:
     that can be exported to various testing frameworks.
     """
     
-    def __init__(self, base_url: str, session_data: Dict[str, Any]):
+    def __init__(self, base_url: str, session_data: Dict[str, Any], openai_api_key: str = None):
         """
         Initialize test case generator.
         
         Args:
             base_url: Base URL of the application
             session_data: Complete exploration session data
+            openai_api_key: Optional OpenAI API key for structured test generation
         """
         self.base_url = base_url
         self.session_data = session_data
         self.domain = self._extract_domain(base_url)
+        self.openai_api_key = openai_api_key
+        
+        # Determine generation mode
+        self.use_structured_approach = bool(openai_api_key)
+        if self.use_structured_approach:
+            logger.info("🧠 Using structured LLM-based test generation")
+        else:
+            logger.info("📄 Using traditional action-based test generation")
         
         # Extract key data
         self.exploration_summary = session_data.get('exploration_summary', {})
@@ -145,6 +154,59 @@ class TestCaseGenerator:
         """
         logger.info("🔍 Analyzing session data for test case generation...")
         logger.info(f"🧪 POST-EXPLORATION: Test generation starting with {len(self.executed_actions)} captured actions from exploration phase")
+        
+        # Choose generation strategy based on available resources
+        if self.use_structured_approach:
+            return self._generate_structured_test_cases()
+        else:
+            return self._generate_traditional_test_cases()
+    
+    def _generate_structured_test_cases(self) -> List[TestSuite]:
+        """Generate test cases using the structured LLM approach."""
+        try:
+            from generators.structured_test_planner import StructuredTestPlanner
+            from generators.structured_test_codegen import TestScenario, ActionType
+            
+            logger.info("🧠 Using structured LLM test generation...")
+            
+            # Generate structured scenarios using LLM
+            planner = StructuredTestPlanner(self.openai_api_key)
+            structured_scenarios = planner.generate_test_scenarios(self.session_data, self.base_url)
+            
+            if not structured_scenarios:
+                logger.warning("⚠️ LLM generated no scenarios, falling back to traditional approach")
+                return self._generate_traditional_test_cases()
+            
+            logger.info(f"✅ LLM generated {len(structured_scenarios)} structured scenarios")
+            
+            # Convert structured scenarios to our TestCase format
+            for scenario in structured_scenarios:
+                test_case = self._convert_scenario_to_test_case(scenario)
+                if test_case:
+                    self.all_test_cases.append(test_case)
+            
+            # Still add state coverage tests using traditional logic
+            self._analyze_state_coverage_from_scenarios(structured_scenarios)
+            state_coverage_tests = self._generate_state_coverage_tests()
+            self.all_test_cases.extend(state_coverage_tests)
+            
+            # Organize into test suites
+            self.test_suites = self._organize_into_suites()
+            
+            logger.info(f"✅ Generated {len(self.all_test_cases)} test cases in {len(self.test_suites)} suites using structured approach")
+            return self.test_suites
+            
+        except ImportError as e:
+            logger.warning(f"⚠️ Structured test components not available: {e}")
+            return self._generate_traditional_test_cases()
+        except Exception as e:
+            logger.error(f"❌ Structured test generation failed: {e}")
+            logger.info("🔄 Falling back to traditional test generation")
+            return self._generate_traditional_test_cases()
+    
+    def _generate_traditional_test_cases(self) -> List[TestSuite]:
+        """Generate test cases using the traditional action-based approach."""
+        logger.info("📄 Using traditional action-based test generation...")
         
         # Extract user journeys from actions
         self.user_journeys = self._extract_user_journeys()
@@ -1650,15 +1712,197 @@ module.exports = defineConfig({{
         
         return coverage_report
 
+    def _convert_scenario_to_test_case(self, scenario) -> Optional[TestCase]:
+        """
+        Convert a structured TestScenario to our internal TestCase format.
+        
+        Args:
+            scenario: TestScenario from StructuredTestPlanner
+            
+        Returns:
+            TestCase object or None if conversion failed
+        """
+        try:
+            # Convert actions to test steps
+            test_steps = []
+            for action in scenario.actions:
+                step = self._convert_structured_action_to_step(action)
+                if step:
+                    test_steps.append(step)
+            
+            if not test_steps:
+                logger.warning(f"⚠️ No valid steps for scenario: {scenario.name}")
+                return None
+            
+            # Map priority
+            priority_map = {
+                'critical': TestPriority.CRITICAL,
+                'high': TestPriority.HIGH,
+                'medium': TestPriority.MEDIUM,
+                'low': TestPriority.LOW
+            }
+            priority = priority_map.get(scenario.priority, TestPriority.MEDIUM)
+            
+            # Create TestCase
+            test_case = TestCase(
+                name=scenario.name,
+                description=scenario.description,
+                priority=priority,
+                user_story=scenario.user_story,
+                preconditions=scenario.preconditions,
+                steps=test_steps,
+                tags=scenario.tags + ['structured_generation'],
+                estimated_duration=scenario.estimated_duration_seconds,
+                retry_count=scenario.max_retries,
+                workflow_category=scenario.category
+            )
+            
+            return test_case
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to convert scenario {scenario.name}: {e}")
+            return None
+    
+    def _convert_structured_action_to_step(self, action) -> Optional[TestStep]:
+        """
+        Convert a structured Action to a TestStep.
+        
+        Args:
+            action: Action from structured scenario
+            
+        Returns:
+            TestStep object or None if conversion failed
+        """
+        try:
+            # Build selector based on strategy
+            selector = self._build_selector_from_structured_action(action)
+            
+            # Convert action type
+            action_map = {
+                'click': 'click',
+                'fill': 'fill',
+                'select': 'select',
+                'navigate': 'goto',
+                'wait_for': 'wait',
+                'verify': 'assert',
+                'hover': 'hover',
+                'screenshot': 'screenshot'
+            }
+            
+            test_action = action_map.get(action.type.value if hasattr(action.type, 'value') else action.type, action.type)
+            
+            # Create test step
+            step = TestStep(
+                action=test_action,
+                selector=selector,
+                value=getattr(action, 'input_value', None),
+                timeout=action.wait_timeout,
+                description=action.description
+            )
+            
+            # Convert verifications to assertions
+            if hasattr(action, 'verifications') and action.verifications:
+                for verification in action.verifications:
+                    assertion = self._convert_verification_to_assertion(verification)
+                    if assertion:
+                        step.assertions.append(assertion)
+            
+            return step
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to convert action: {e}")
+            return None
+    
+    def _build_selector_from_structured_action(self, action) -> str:
+        """Build a selector string from structured action data."""
+        try:
+            strategy = action.selector_strategy
+            value = action.selector_value
+            
+            if strategy == 'text':
+                return f'text="{value}"'
+            elif strategy == 'role':
+                return f'[role="{value}"]'
+            elif strategy == 'aria_label':
+                return f'[aria-label="{value}"]'
+            elif strategy == 'id':
+                return f'#{value}'
+            elif strategy == 'css':
+                return value
+            elif strategy == 'xpath':
+                return f'xpath={value}'
+            else:
+                return value  # Fallback to raw value
+                
+        except Exception:
+            return getattr(action, 'selector_value', '')
+    
+    def _convert_verification_to_assertion(self, verification) -> Optional[TestAssertion]:
+        """Convert a structured verification to a TestAssertion."""
+        try:
+            return TestAssertion(
+                type=verification.type,
+                selector=getattr(verification, 'selector_value', ''),
+                expected=verification.expected_value,
+                description=verification.description,
+                timeout=getattr(verification, 'timeout', 5000)
+            )
+        except Exception as e:
+            logger.debug(f"Failed to convert verification: {e}")
+            return None
+    
+    def _analyze_state_coverage_from_scenarios(self, scenarios) -> None:
+        """
+        Analyze which states are covered by the structured scenarios.
+        
+        Args:
+            scenarios: List of TestScenario objects
+        """
+        try:
+            for scenario in scenarios:
+                # Extract expected states from scenario
+                if hasattr(scenario, 'expected_states_visited'):
+                    for state_id in scenario.expected_states_visited:
+                        self.covered_states.add(state_id)
+                
+                # Also try to infer coverage from actions
+                for action in scenario.actions:
+                    # Look for state references in action descriptions or URLs
+                    if hasattr(action, 'verifications'):
+                        for verification in action.verifications:
+                            if verification.type in ['url_contains', 'url_exact']:
+                                # Try to find matching state by URL
+                                url_pattern = verification.expected_value
+                                matching_states = self._find_states_by_url_pattern(url_pattern)
+                                self.covered_states.update(matching_states)
+            
+            logger.info(f"📊 Structured scenarios cover {len(self.covered_states)} states")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to analyze state coverage from scenarios: {e}")
+    
+    def _find_states_by_url_pattern(self, url_pattern: str) -> set:
+        """Find state fingerprints that match a URL pattern."""
+        matching_states = set()
+        try:
+            for state_fp, state_data in self.discovered_states.items():
+                state_url = state_data.get('url', '')
+                if url_pattern in state_url:
+                    matching_states.add(state_fp)
+        except Exception as e:
+            logger.debug(f"Failed to match URL pattern {url_pattern}: {e}")
+        return matching_states
+
 
 # Usage example
-async def generate_tests_from_session(session_dir: Path, output_dir: Path) -> Dict[str, Any]:
+async def generate_tests_from_session(session_dir: Path, output_dir: Path, openai_api_key: str = None) -> Dict[str, Any]:
     """
     Generate test cases from a saved exploration session.
     
     Args:
         session_dir: Path to exploration session directory
         output_dir: Path to save generated test files
+        openai_api_key: Optional OpenAI API key for structured generation
         
     Returns:
         Summary of generated tests
@@ -1674,8 +1918,8 @@ async def generate_tests_from_session(session_dir: Path, output_dir: Path) -> Di
     # Extract base URL
     base_url = session_data.get('session_info', {}).get('base_url', 'https://example.com')
     
-    # Generate test cases
-    generator = TestCaseGenerator(base_url, session_data.get('exploration_results', {}))
+    # Generate test cases with optional structured approach
+    generator = TestCaseGenerator(base_url, session_data.get('exploration_results', {}), openai_api_key)
     test_suites = generator.generate_test_cases()
     
     # Export to all frameworks
@@ -1689,7 +1933,8 @@ async def generate_tests_from_session(session_dir: Path, output_dir: Path) -> Di
     with open(summary_path, 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, default=str)
     
-    logger.info(f"✅ Test generation complete! Generated {summary['generation_summary']['total_test_cases']} tests")
+    generation_mode = "structured LLM" if openai_api_key else "traditional action-based"
+    logger.info(f"✅ Test generation complete using {generation_mode} approach! Generated {summary['generation_summary']['total_test_cases']} tests")
     logger.info(f"📄 Summary saved: {summary_path}")
     
     return summary

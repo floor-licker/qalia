@@ -205,23 +205,38 @@ class SessionManager:
             f.write(analysis_xml)
         logger.info(f"🤖 ChatGPT analysis XML saved: {analysis_xml_path}")
         
-        # Attempt ChatGPT analysis with graceful degradation
+        # Attempt structured test generation with graceful degradation
         try:
-        chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
-            report['chatgpt_analysis'] = {
+            structured_results = await self.generate_structured_test_cases(exploration_results)
+            report['structured_test_generation'] = {
                 'status': 'completed',
-                'analysis_file': str(chatgpt_analysis_file)
+                'scenarios_generated': structured_results.get('metadata', {}).get('total_scenarios', 0),
+                'test_files': structured_results.get('test_files', {}),
+                'output_directory': structured_results.get('output_directory')
             }
-            logger.info(f"✅ ChatGPT analysis completed successfully")
+            logger.info(f"✅ Structured test generation completed successfully")
         except Exception as e:
-            logger.error(f"⚠️ ChatGPT analysis failed: {e}")
-            # Store the failure but continue with session reporting
-            report['chatgpt_analysis'] = {
-                'status': 'failed',
-                'error': str(e),
-                'analysis_file': None
-            }
-            logger.info(f"📋 Session report will continue without ChatGPT analysis")
+            logger.warning(f"⚠️ Structured test generation failed: {e}")
+            
+            # Fallback to legacy ChatGPT analysis
+            try:
+                chatgpt_analysis_file = await self.analyze_with_chatgpt(analysis_xml, exploration_results)
+                report['chatgpt_analysis'] = {
+                    'status': 'completed',
+                    'analysis_file': str(chatgpt_analysis_file)
+                }
+                logger.info(f"✅ Fallback ChatGPT analysis completed successfully")
+            except Exception as fallback_error:
+                logger.error(f"⚠️ Both structured and fallback analysis failed")
+                # Store both failures but continue with session reporting
+                report['test_generation'] = {
+                    'structured_status': 'failed',
+                    'structured_error': str(e),
+                    'chatgpt_status': 'failed', 
+                    'chatgpt_error': str(fallback_error),
+                    'analysis_file': None
+                }
+                logger.info(f"📋 Session report will continue without test generation")
         
         # Re-save the report with ChatGPT analysis info
         with open(report_path, 'w', encoding='utf-8') as f:
@@ -559,8 +574,6 @@ class SessionManager:
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")
     
-
-    
     def _get_button_expected_behavior(self, element_text: str) -> str:
         """Get generic expected behavior for button - let LLM determine specific behavior."""
         # Generic expectation - let LLM interpret the specific behavior based on context
@@ -766,7 +779,7 @@ class SessionManager:
                 logger.info("🔗 Including state fingerprint XML for enhanced analysis (multiple states detected)")
             else:
                 # Use only action analysis XML
-            prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
+                prompt = prompt.replace("[XML_REPORT_PLACEHOLDER]", xml_content)
                 logger.info("📄 Using action analysis XML only (insufficient state data for enhancement)")
             
             # Final validation - ensure XML was actually inserted
@@ -845,7 +858,8 @@ class SessionManager:
     
     def _load_prompt_template(self) -> str:
         """Load the ChatGPT analysis prompt template from file."""
-        prompt_file = Path("prompts/chatgpt_analysis_prompt.txt")
+        # Use structured prompt for JSON-based test generation
+        prompt_file = Path("prompts/chatgpt_structured_analysis_prompt.txt")
         
         try:
             with open(prompt_file, 'r', encoding='utf-8') as f:
@@ -857,11 +871,19 @@ class SessionManager:
                 
                 return content
         except FileNotFoundError:
-            raise FileNotFoundError(f"❌ CRITICAL: Prompt template not found at {prompt_file}. XML analysis cannot proceed without proper prompt template.")
+            # Fallback to original prompt if structured one doesn't exist
+            logger.warning(f"⚠️ Structured prompt not found at {prompt_file}, falling back to original")
+            original_prompt_file = Path("prompts/chatgpt_analysis_prompt.txt")
+            
+            with open(original_prompt_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+                if "[XML_REPORT_PLACEHOLDER]" not in content:
+                    raise ValueError(f"Prompt template missing required XML placeholder: {original_prompt_file}")
+                
+                return content
         except Exception as e:
             raise RuntimeError(f"❌ CRITICAL: Failed to load prompt template from {prompt_file}: {e}")
-    
-
     
     def _load_system_prompt(self) -> str:
         """Load the ChatGPT system prompt from file."""
@@ -880,8 +902,6 @@ class SessionManager:
             raise FileNotFoundError(f"❌ CRITICAL: System prompt not found at {system_prompt_file}. XML analysis cannot proceed without proper system prompt.")
         except Exception as e:
             raise RuntimeError(f"❌ CRITICAL: Failed to load system prompt from {system_prompt_file}: {e}")
-    
-
     
     async def _save_chatgpt_analysis(self, chatgpt_response: str, exploration_results: Dict[str, Any]) -> list[str]:
         """Save ChatGPT analysis in multiple formats."""
@@ -1147,7 +1167,7 @@ The following words need human judgment:
         except ValueError as e:
             # Re-raise ValueError as-is (from wrong root element check)
             raise e
-            except Exception as e:
+        except Exception as e:
             raise RuntimeError(f"❌ CRITICAL: Failed to parse state fingerprint XML: {e}")
     
     def _combine_xml_files(self, action_xml: str, state_xml: str) -> str:
@@ -1190,4 +1210,132 @@ The following words need human judgment:
             
         except Exception as e:
             logger.error(f"Failed to combine XML files: {e}")
-            raise RuntimeError(f"❌ CRITICAL: Failed to combine XML files: {e}") 
+            raise RuntimeError(f"❌ CRITICAL: Failed to combine XML files: {e}")
+    
+    async def generate_structured_test_cases(self, exploration_results: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate structured test cases using the StructuredTestPlanner approach.
+        This replaces the old text-based ChatGPT analysis with JSON-based test generation.
+        
+        Args:
+            exploration_results: Results from exploration
+            
+        Returns:
+            Dictionary containing structured test scenarios and generated test files
+        """
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise RuntimeError("❌ CRITICAL: OPENAI_API_KEY not found in environment. Structured test generation requires OpenAI API access.")
+        
+        try:
+            # Import the structured test components
+            from generators.structured_test_planner import StructuredTestPlanner
+            from generators.structured_test_codegen import StructuredTestCodeGenerator
+            
+            logger.info("🧠 Generating structured test scenarios using LLM...")
+            
+            # 1. Generate structured scenarios using LLM
+            planner = StructuredTestPlanner(api_key)
+            scenarios = planner.generate_test_scenarios(exploration_results, self.base_url)
+            
+            if not scenarios:
+                logger.warning("⚠️ No test scenarios generated")
+                return {
+                    'status': 'no_scenarios',
+                    'scenarios': [],
+                    'test_files': {}
+                }
+            
+            logger.info(f"✅ Generated {len(scenarios)} structured test scenarios")
+            
+            # 2. Generate test code for all frameworks
+            code_generator = StructuredTestCodeGenerator(self.base_url)
+            test_files = {}
+            
+            # Create test output directories
+            test_output_dir = self.session_dir / "generated_tests"
+            playwright_dir = test_output_dir / "playwright"
+            cypress_dir = test_output_dir / "cypress"
+            jest_dir = test_output_dir / "jest"
+            
+            for dir_path in [playwright_dir, cypress_dir, jest_dir]:
+                dir_path.mkdir(parents=True, exist_ok=True)
+            
+            # Generate Playwright tests
+            try:
+                playwright_files = code_generator.generate_playwright_tests(scenarios, playwright_dir)
+                test_files['playwright'] = [str(f) for f in playwright_files]
+                logger.info(f"✅ Generated {len(playwright_files)} Playwright test files")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate Playwright tests: {e}")
+                test_files['playwright'] = []
+            
+            # Generate Cypress tests
+            try:
+                cypress_files = code_generator.generate_cypress_tests(scenarios, cypress_dir)
+                test_files['cypress'] = [str(f) for f in cypress_files]
+                logger.info(f"✅ Generated {len(cypress_files)} Cypress test files")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate Cypress tests: {e}")
+                test_files['cypress'] = []
+            
+            # Generate Jest tests
+            try:
+                jest_files = code_generator.generate_jest_tests(scenarios, jest_dir)
+                test_files['jest'] = [str(f) for f in jest_files]
+                logger.info(f"✅ Generated {len(jest_files)} Jest test files")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate Jest tests: {e}")
+                test_files['jest'] = []
+            
+            # 3. Save structured scenario metadata
+            scenarios_metadata = {
+                'total_scenarios': len(scenarios),
+                'scenarios_by_category': {},
+                'scenarios_by_priority': {},
+                'estimated_total_duration': sum(s.estimated_duration_seconds for s in scenarios),
+                'frameworks_generated': list(test_files.keys())
+            }
+            
+            # Analyze scenarios
+            for scenario in scenarios:
+                # By category
+                category = scenario.category
+                if category not in scenarios_metadata['scenarios_by_category']:
+                    scenarios_metadata['scenarios_by_category'][category] = 0
+                scenarios_metadata['scenarios_by_category'][category] += 1
+                
+                # By priority
+                priority = scenario.priority
+                if priority not in scenarios_metadata['scenarios_by_priority']:
+                    scenarios_metadata['scenarios_by_priority'][priority] = 0
+                scenarios_metadata['scenarios_by_priority'][priority] += 1
+            
+            # Save metadata
+            metadata_file = test_output_dir / "test_generation_metadata.json"
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'generation_timestamp': datetime.now().isoformat(),
+                    'session_id': self.session_id,
+                    'base_url': self.base_url,
+                    'scenarios_metadata': scenarios_metadata,
+                    'test_files': test_files,
+                    'structured_approach': True
+                }, f, indent=2)
+            
+            logger.info(f"📊 Test generation metadata saved: {metadata_file}")
+            
+            return {
+                'status': 'success',
+                'scenarios': scenarios,
+                'test_files': test_files,
+                'metadata': scenarios_metadata,
+                'output_directory': str(test_output_dir)
+            }
+            
+        except ImportError as e:
+            logger.error(f"❌ Structured test generation not available: {e}")
+            raise RuntimeError(f"Structured test generation components not found: {e}")
+        except Exception as e:
+            logger.error(f"❌ Structured test generation failed: {e}")
+            raise RuntimeError(f"Failed to generate structured test cases: {e}") 
