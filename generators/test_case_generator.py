@@ -118,13 +118,23 @@ class TestCaseGenerator:
         self.detailed_results = session_data.get('detailed_results', {})
         self.executed_actions = self.detailed_results.get('executed_actions', [])
         
+        # NEW: Extract state graph data for comprehensive coverage
+        self.state_graph_data = self._load_state_graph_data()
+        self.discovered_states = self.state_graph_data.get('states', {})
+        self.state_transitions = self.state_graph_data.get('transitions', [])
+        
         # Analysis results
         self.user_journeys = {}
         self.test_suites = []
         self.all_test_cases = []
         
+        # NEW: State coverage tracking
+        self.covered_states = set()
+        self.state_coverage_tests = []
+        
         logger.info(f"🧪 Test generator initialized for {base_url}")
         logger.info(f"📊 Found {len(self.executed_actions)} actions to analyze")
+        logger.info(f"🗺️ Found {len(self.discovered_states)} states to cover")
     
     def generate_test_cases(self) -> List[TestSuite]:
         """
@@ -145,6 +155,13 @@ class TestCaseGenerator:
             test_cases = self._generate_journey_test_cases(journey_name, journey_actions)
             self.all_test_cases.extend(test_cases)
         
+        # NEW: Track which states are covered by journey tests
+        self._analyze_state_coverage_from_journeys()
+        
+        # NEW: Generate additional tests for uncovered states
+        state_coverage_tests = self._generate_state_coverage_tests()
+        self.all_test_cases.extend(state_coverage_tests)
+        
         # Generate additional specialized test cases
         self.all_test_cases.extend(self._generate_error_handling_tests())
         self.all_test_cases.extend(self._generate_performance_tests())
@@ -152,6 +169,10 @@ class TestCaseGenerator:
         
         # Organize into test suites
         self.test_suites = self._organize_into_suites()
+        
+        # NEW: Validate complete state coverage
+        coverage_report = self._validate_state_coverage()
+        logger.info(f"🎯 State Coverage: {coverage_report['coverage_percentage']:.1f}% ({coverage_report['covered_states']}/{coverage_report['total_states']} states)")
         
         logger.info(f"✅ Generated {len(self.all_test_cases)} test cases in {len(self.test_suites)} suites")
         return self.test_suites
@@ -563,14 +584,25 @@ class TestCaseGenerator:
         # Create TestSuite objects
         test_suites = []
         for category, tests in suites.items():
-            suite = TestSuite(
-                name=f"{category}_tests",
-                description=f"Test suite for {category.replace('_', ' ')} functionality",
-                test_cases=tests,
-                base_url=self.base_url,
-                parallel_execution=len(tests) > 1,
-                max_retries=3
-            )
+            # Special handling for state coverage suite
+            if category == "state_coverage":
+                suite = TestSuite(
+                    name=f"{category}_tests",
+                    description=f"State coverage tests ensuring all discovered states are reachable",
+                    test_cases=tests,
+                    base_url=self.base_url,
+                    parallel_execution=True,  # State coverage tests can run in parallel
+                    max_retries=2  # Lower retries for coverage tests
+                )
+            else:
+                suite = TestSuite(
+                    name=f"{category}_tests",
+                    description=f"Test suite for {category.replace('_', ' ')} functionality",
+                    test_cases=tests,
+                    base_url=self.base_url,
+                    parallel_execution=len(tests) > 1,
+                    max_retries=3
+                )
             test_suites.append(suite)
         
         return test_suites
@@ -921,6 +953,9 @@ module.exports = defineConfig({{
             category = test_case.workflow_category
             category_breakdown[category] = category_breakdown.get(category, 0) + 1
         
+        # NEW: State coverage analysis
+        coverage_report = self._validate_state_coverage()
+        
         return {
             "generation_summary": {
                 "total_test_cases": total_tests,
@@ -932,21 +967,688 @@ module.exports = defineConfig({{
                 "by_priority": priority_breakdown,
                 "by_category": category_breakdown
             },
+            "state_coverage": {
+                "total_states_discovered": coverage_report['total_states'],
+                "states_covered_by_tests": coverage_report['covered_states'],
+                "coverage_percentage": coverage_report['coverage_percentage'],
+                "uncovered_states_count": coverage_report['uncovered_states'],
+                "is_complete_coverage": coverage_report['is_complete'],
+                "uncovered_state_samples": coverage_report['uncovered_state_list']
+            },
             "test_suites": [
                 {
                     "name": suite.name,
                     "description": suite.description,
                     "test_count": len(suite.test_cases),
-                    "estimated_duration": sum(tc.estimated_duration for tc in suite.test_cases)
+                    "estimated_duration": sum(tc.estimated_duration for tc in suite.test_cases),
+                    "is_state_coverage": "state_coverage" in suite.name
                 }
                 for suite in self.test_suites
             ],
             "metadata": {
                 "base_url": self.base_url,
                 "source_session": self.session_data.get('session_info', {}).get('session_id', 'unknown'),
-                "total_source_actions": len(self.executed_actions)
+                "total_source_actions": len(self.executed_actions),
+                "state_tracking_enabled": len(self.discovered_states) > 0
             }
         }
+
+    def _load_state_graph_data(self) -> Dict[str, Any]:
+        """
+        Load state graph data from XML state fingerprint or session data.
+        
+        Returns:
+            Dictionary containing states and transitions data
+        """
+        try:
+            # Try to parse XML state fingerprint if available
+            if hasattr(self.session_data, 'state_fingerprint_xml'):
+                return self._parse_state_xml(self.session_data.state_fingerprint_xml)
+            
+            # Try to load from session data structure
+            session_info = self.session_data.get('session_info', {})
+            session_dir = session_info.get('session_dir')
+            
+            if session_dir:
+                from pathlib import Path
+                state_xml_path = Path(session_dir) / "reports" / f"state_fingerprint_{self.domain}.xml"
+                if state_xml_path.exists():
+                    with open(state_xml_path, 'r', encoding='utf-8') as f:
+                        xml_content = f.read()
+                    return self._parse_state_xml(xml_content)
+            
+            # Fallback: derive states from action data
+            return self._derive_states_from_actions()
+            
+        except Exception as e:
+            logger.warning(f"Failed to load state graph data: {e}")
+            return {'states': {}, 'transitions': []}
+
+    def _parse_state_xml(self, xml_content: str) -> Dict[str, Any]:
+        """
+        Parse XML state fingerprint to extract states and transitions.
+        
+        Args:
+            xml_content: XML content with state fingerprint data
+            
+        Returns:
+            Dictionary with parsed states and transitions
+        """
+        import xml.etree.ElementTree as ET
+        
+        try:
+            root = ET.fromstring(xml_content)
+            states = {}
+            transitions = []
+            
+            # Parse states
+            states_elem = root.find('States')
+            if states_elem is not None:
+                for state_elem in states_elem.findall('State'):
+                    fingerprint = state_elem.get('fingerprint')
+                    state_type = state_elem.get('type')
+                    
+                    url_elem = state_elem.find('URL')
+                    url = url_elem.text if url_elem is not None else ''
+                    
+                    # Extract interactive elements for this state
+                    interactive_elements = []
+                    elements_elem = state_elem.find('InteractiveElements')
+                    if elements_elem is not None:
+                        for elem_type in elements_elem.findall('ElementType'):
+                            for element in elem_type.findall('Element'):
+                                selector = element.get('selector', '')
+                                text_elem = element.find('Text')
+                                text = text_elem.text if text_elem is not None else ''
+                                
+                                interactive_elements.append({
+                                    'type': elem_type.get('type'),
+                                    'selector': selector,
+                                    'text': text
+                                })
+                    
+                    states[fingerprint] = {
+                        'fingerprint': fingerprint,
+                        'url': url,
+                        'type': state_type,
+                        'interactive_elements': interactive_elements
+                    }
+            
+            # Parse transitions
+            transitions_elem = root.find('Transitions')
+            if transitions_elem is not None:
+                for trans_elem in transitions_elem.findall('Transition'):
+                    from_state_elem = trans_elem.find('FromState')
+                    to_state_elem = trans_elem.find('ToState')
+                    action_elem = trans_elem.find('Action')
+                    
+                    if from_state_elem is not None and to_state_elem is not None:
+                        transition = {
+                            'from_state': from_state_elem.text,
+                            'to_state': to_state_elem.text,
+                            'success': trans_elem.get('success', 'true').lower() == 'true'
+                        }
+                        
+                        if action_elem is not None:
+                            target_elem = action_elem.find('Target')
+                            transition['action'] = {
+                                'type': action_elem.get('type'),
+                                'target': target_elem.text if target_elem is not None else ''
+                            }
+                        
+                        transitions.append(transition)
+            
+            return {'states': states, 'transitions': transitions}
+            
+        except ET.ParseError as e:
+            logger.error(f"Failed to parse state XML: {e}")
+            return {'states': {}, 'transitions': []}
+
+    def _derive_states_from_actions(self) -> Dict[str, Any]:
+        """
+        Derive state information from executed actions as fallback.
+        
+        Returns:
+            Dictionary with derived states and transitions
+        """
+        states = {}
+        transitions = []
+        
+        # Group actions by URL to create basic states
+        url_states = {}
+        for i, action in enumerate(self.executed_actions):
+            action_data = action.get('action', {})
+            url = action.get('url', self.base_url)
+            
+            # Create a simple state fingerprint based on URL
+            state_fingerprint = f"url_state_{abs(hash(url)) % 10000}"
+            
+            if state_fingerprint not in url_states:
+                url_states[state_fingerprint] = {
+                    'fingerprint': state_fingerprint,
+                    'url': url,
+                    'type': 'page',
+                    'interactive_elements': []
+                }
+            
+            # Add interactive element if not already present
+            if action_data.get('target'):
+                element = {
+                    'type': action_data.get('element_type', 'unknown'),
+                    'selector': action_data.get('target'),
+                    'text': action_data.get('text', '')
+                }
+                if element not in url_states[state_fingerprint]['interactive_elements']:
+                    url_states[state_fingerprint]['interactive_elements'].append(element)
+        
+        return {'states': url_states, 'transitions': transitions}
+
+    def _analyze_state_coverage_from_journeys(self) -> None:
+        """
+        Analyze which states are covered by existing journey-based tests.
+        """
+        logger.info("🔍 Analyzing state coverage from user journey tests...")
+        
+        for test_case in self.all_test_cases:
+            # Extract state transitions from test steps
+            for step in test_case.steps:
+                if step.action == 'goto':
+                    # Direct navigation to URL - find matching state
+                    target_url = step.value
+                    matching_state = self._find_state_by_url(target_url)
+                    if matching_state:
+                        self.covered_states.add(matching_state['fingerprint'])
+                        
+                elif step.action in ['click', 'fill']:
+                    # Interaction that might lead to state transition
+                    state_transitions = self._find_transitions_by_action(step)
+                    for transition in state_transitions:
+                        self.covered_states.add(transition['to_state'])
+        
+        logger.info(f"📊 Journey tests cover {len(self.covered_states)} states")
+
+    def _generate_state_coverage_tests(self) -> List[TestCase]:
+        """
+        Generate tests using greedy path extension to cover maximum states per test.
+        
+        This improved algorithm finds longer paths that visit multiple uncovered states,
+        rather than generating individual tests for each state.
+        
+        Returns:
+            List of test cases optimized for maximum state coverage
+        """
+        uncovered_states = set(self._get_uncovered_states())
+        coverage_tests = []
+        
+        logger.info(f"🎯 Starting greedy path coverage for {len(uncovered_states)} uncovered states...")
+        
+        iteration = 1
+        while uncovered_states:
+            # Find the longest path that covers multiple uncovered states
+            optimal_path = self._find_maximal_coverage_path(uncovered_states)
+            
+            if not optimal_path:
+                logger.warning(f"⚠️ No path found for remaining {len(uncovered_states)} states")
+                break
+            
+            # Generate one test for this multi-state path
+            test_case = self._create_multi_state_coverage_test(optimal_path, iteration)
+            if test_case:
+                coverage_tests.append(test_case)
+                
+                # Remove covered states from uncovered set
+                covered_by_this_path = set(optimal_path['visited_uncovered_states'])
+                uncovered_states -= covered_by_this_path
+                self.covered_states.update(covered_by_this_path)
+                
+                logger.debug(f"✅ Path {iteration}: covers {len(covered_by_this_path)} states in {optimal_path['total_steps']} steps")
+            
+            iteration += 1
+            
+            # Safety check to prevent infinite loops
+            if iteration > len(self.discovered_states):
+                logger.warning("⚠️ Breaking coverage loop - possible infinite recursion")
+                break
+        
+        logger.info(f"📝 Generated {len(coverage_tests)} optimized coverage tests (vs {len(self._get_uncovered_states()) + len(coverage_tests)} with BFS)")
+        return coverage_tests
+
+    def _find_maximal_coverage_path(self, uncovered_states: set) -> Optional[Dict[str, Any]]:
+        """
+        Find the longest path from base state that visits maximum uncovered states.
+        
+        Uses greedy path extension to prioritize multi-state coverage.
+        
+        Args:
+            uncovered_states: Set of state fingerprints not yet covered
+            
+        Returns:
+            Dictionary with path information and coverage statistics
+        """
+        best_path = None
+        max_coverage = 0
+        
+        # Try to find extended paths to each uncovered state
+        for target_state in uncovered_states:
+            try:
+                path_info = self._find_extended_path_to_state(target_state, uncovered_states)
+                
+                if path_info:
+                    states_covered = len(path_info['visited_uncovered_states'])
+                    
+                    # Prioritize paths that cover more states
+                    if states_covered > max_coverage:
+                        max_coverage = states_covered
+                        best_path = path_info
+                        
+            except Exception as e:
+                logger.debug(f"Path finding failed for state {target_state[:8]}: {e}")
+                continue
+        
+        return best_path
+
+    def _find_extended_path_to_state(self, target_state: str, uncovered_states: set) -> Optional[Dict[str, Any]]:
+        """
+        Find path to target state and greedily extend it to visit more uncovered states.
+        
+        Args:
+            target_state: Primary target state to reach
+            uncovered_states: Set of all uncovered states to potentially visit
+            
+        Returns:
+            Extended path information with maximum state coverage
+        """
+        # First, find basic path to target state
+        base_path = self._find_path_to_state(target_state)
+        
+        if not base_path:
+            return None
+        
+        # Extend this path to visit additional uncovered states
+        extended_path = self._extend_path_greedily(base_path, uncovered_states)
+        
+        # Analyze what states this path visits
+        visited_states = self._extract_states_from_path(extended_path)
+        visited_uncovered = [state for state in visited_states if state in uncovered_states]
+        
+        return {
+            'transitions': extended_path,
+            'visited_uncovered_states': visited_uncovered,
+            'visited_all_states': visited_states,
+            'total_steps': len(extended_path),
+            'target_state': target_state,
+            'coverage_efficiency': len(visited_uncovered) / len(extended_path) if extended_path else 0
+        }
+
+    def _extend_path_greedily(self, base_path: List[Dict[str, Any]], uncovered_states: set) -> List[Dict[str, Any]]:
+        """
+        Greedily extend a path to visit as many uncovered states as possible.
+        
+        Args:
+            base_path: Initial path transitions
+            uncovered_states: States we want to visit
+            
+        Returns:
+            Extended path with additional transitions to uncovered states
+        """
+        extended_path = base_path.copy()
+        
+        # Determine current state at end of base path
+        if extended_path:
+            current_state = extended_path[-1]['to_state']
+        else:
+            # Start from base state if no initial path
+            current_state = self._find_base_state()
+        
+        # Track visited states to avoid cycles
+        visited_states = set()
+        for transition in extended_path:
+            visited_states.add(transition['from_state'])
+            visited_states.add(transition['to_state'])
+        
+        # Greedily extend path to visit more uncovered states
+        max_extensions = 10  # Prevent excessively long paths
+        extensions = 0
+        
+        while extensions < max_extensions:
+            # Find next reachable uncovered state
+            next_state = self._find_next_reachable_uncovered_state(
+                current_state, uncovered_states, visited_states
+            )
+            
+            if not next_state:
+                break  # No more reachable uncovered states
+            
+            # Find transition to next state
+            transition = self._find_transition_between_states(current_state, next_state)
+            
+            if transition:
+                extended_path.append(transition)
+                visited_states.add(next_state)
+                current_state = next_state
+                extensions += 1
+            else:
+                break  # No valid transition found
+        
+        return extended_path
+
+    def _find_next_reachable_uncovered_state(self, current_state: str, uncovered_states: set, visited_states: set) -> Optional[str]:
+        """
+        Find the next uncovered state reachable from current state.
+        
+        Prioritizes states that lead to even more uncovered states (lookahead).
+        
+        Args:
+            current_state: Current position in the path
+            uncovered_states: States we want to visit
+            visited_states: States already visited in this path
+            
+        Returns:
+            Next best uncovered state to visit, or None
+        """
+        reachable_uncovered = []
+        
+        # Find all uncovered states directly reachable from current state
+        for transition in self.state_transitions:
+            if (transition['from_state'] == current_state and 
+                transition.get('success', True) and
+                transition['to_state'] in uncovered_states and
+                transition['to_state'] not in visited_states):
+                
+                target_state = transition['to_state']
+                
+                # Calculate lookahead score: how many more uncovered states can we reach from there?
+                lookahead_score = self._calculate_lookahead_score(target_state, uncovered_states, visited_states)
+                
+                reachable_uncovered.append({
+                    'state': target_state,
+                    'transition': transition,
+                    'lookahead_score': lookahead_score
+                })
+        
+        if not reachable_uncovered:
+            return None
+        
+        # Sort by lookahead score (prioritize states that lead to more uncovered states)
+        reachable_uncovered.sort(key=lambda x: x['lookahead_score'], reverse=True)
+        
+        return reachable_uncovered[0]['state']
+
+    def _calculate_lookahead_score(self, state: str, uncovered_states: set, visited_states: set) -> int:
+        """
+        Calculate how many additional uncovered states are reachable from given state.
+        
+        This helps prioritize paths that lead to more coverage opportunities.
+        """
+        score = 0
+        
+        # Count directly reachable uncovered states
+        for transition in self.state_transitions:
+            if (transition['from_state'] == state and 
+                transition.get('success', True) and
+                transition['to_state'] in uncovered_states and
+                transition['to_state'] not in visited_states):
+                score += 1
+        
+        return score
+
+    def _find_transition_between_states(self, from_state: str, to_state: str) -> Optional[Dict[str, Any]]:
+        """Find transition between two specific states."""
+        for transition in self.state_transitions:
+            if (transition['from_state'] == from_state and 
+                transition['to_state'] == to_state and
+                transition.get('success', True)):
+                return transition
+        return None
+
+    def _extract_states_from_path(self, path: List[Dict[str, Any]]) -> List[str]:
+        """Extract all states visited in a transition path."""
+        if not path:
+            return [self._find_base_state()]
+        
+        states = [path[0]['from_state']]  # Starting state
+        for transition in path:
+            states.append(transition['to_state'])
+        
+        return states
+
+    def _find_base_state(self) -> str:
+        """Find the base state (usually corresponds to base URL)."""
+        # Try to find state matching base URL
+        for state_fp, state_data in self.discovered_states.items():
+            state_url = state_data.get('url', '')
+            if (state_url == self.base_url or 
+                state_url == self.base_url + '/' or
+                state_url.rstrip('/') == self.base_url.rstrip('/')):
+                return state_fp
+        
+        # Fallback: use first state if base URL state not found
+        if self.discovered_states:
+            return list(self.discovered_states.keys())[0]
+        
+        return None
+
+    def _create_multi_state_coverage_test(self, path_info: Dict[str, Any], iteration: int) -> Optional[TestCase]:
+        """
+        Create a test case that covers multiple states using the extended path.
+        
+        Args:
+            path_info: Extended path information with multiple state coverage
+            iteration: Test iteration number for naming
+            
+        Returns:
+            TestCase that visits multiple states in one test
+        """
+        if not path_info or not path_info['transitions']:
+            return None
+        
+        steps = []
+        transitions = path_info['transitions']
+        visited_states = path_info['visited_uncovered_states']
+        
+        # Convert each transition to a test step
+        for i, transition in enumerate(transitions):
+            action = transition.get('action', {})
+            action_type = action.get('type', 'click')
+            target = action.get('target', '')
+            
+            if action_type and target:
+                step = TestStep(
+                    action=action_type,
+                    selector=target,
+                    description=f"Step {i+1}: {action_type} on {target}",
+                    timeout=6000  # Slightly longer timeout for complex paths
+                )
+                steps.append(step)
+        
+        if not steps:
+            return None
+        
+        # Add verification for key states reached
+        self._add_multi_state_assertions(steps, visited_states, path_info)
+        
+        # Create descriptive test name and metadata
+        state_count = len(visited_states)
+        primary_state = path_info.get('target_state', 'unknown')[:8]
+        
+        test_case = TestCase(
+            name=f"test_coverage_path_{iteration}_{state_count}_states",
+            description=f"Navigate through {state_count} states via extended path (primary: {primary_state})",
+            priority=TestPriority.MEDIUM,
+            user_story=f"As a test, I want to verify {state_count} states are reachable in a single navigation flow",
+            preconditions=[f"User starts at {self.base_url}"],
+            steps=steps,
+            tags=["state_coverage", "multi_state", "path_traversal", f"covers_{state_count}_states"],
+            estimated_duration=len(steps) * 3,  # 3 seconds per step
+            workflow_category="state_coverage"
+        )
+        
+        return test_case
+
+    def _add_multi_state_assertions(self, steps: List[TestStep], visited_states: List[str], path_info: Dict[str, Any]) -> None:
+        """
+        Add assertions to verify we reached the intended states.
+        
+        Args:
+            steps: Test steps to add assertions to
+            visited_states: States that should be visited
+            path_info: Path information for additional context
+        """
+        if not steps or not visited_states:
+            return
+        
+        # Add assertion to final step to verify we reached the end state
+        final_state_fp = visited_states[-1]
+        final_state_data = self.discovered_states.get(final_state_fp, {})
+        
+        # Verify URL if available
+        final_url = final_state_data.get('url')
+        if final_url and final_url != self.base_url:
+            steps[-1].assertions.append(TestAssertion(
+                type='url',
+                selector='',
+                expected=final_url,
+                description=f"Verify we reached final state URL: {final_url}"
+            ))
+        
+        # Verify presence of key interactive elements in final state
+        interactive_elements = final_state_data.get('interactive_elements', [])
+        if interactive_elements:
+            # Use first interactive element as state verification
+            key_element = interactive_elements[0]
+            element_selector = key_element.get('selector', '')
+            element_text = key_element.get('text', 'element')
+            
+            if element_selector:
+                steps[-1].assertions.append(TestAssertion(
+                    type='visible',
+                    selector=element_selector,
+                    expected='true',
+                    description=f"Verify state-specific element is present: {element_text}"
+                ))
+        
+        # Add intermediate assertions for complex paths
+        if len(steps) > 5:
+            # Add assertion at midpoint to verify path progress
+            mid_step_index = len(steps) // 2
+            mid_state_index = min(mid_step_index, len(visited_states) - 1)
+            
+            if mid_state_index > 0:
+                mid_state_data = self.discovered_states.get(visited_states[mid_state_index], {})
+                mid_url = mid_state_data.get('url')
+                
+                if mid_url and mid_url != self.base_url:
+                    steps[mid_step_index].assertions.append(TestAssertion(
+                        type='url',
+                        selector='',
+                        expected=mid_url,
+                        description=f"Verify intermediate state reached: {mid_url}"
+                    ))
+
+    def _get_uncovered_states(self) -> List[str]:
+        """Get list of state fingerprints that are not yet covered by tests."""
+        all_states = set(self.discovered_states.keys())
+        uncovered = all_states - self.covered_states
+        return list(uncovered)
+
+    def _find_state_by_url(self, url: str) -> Optional[Dict[str, Any]]:
+        """Find state data matching the given URL."""
+        for state_data in self.discovered_states.values():
+            if state_data.get('url') == url:
+                return state_data
+        return None
+
+    def _find_transitions_by_action(self, step: TestStep) -> List[Dict[str, Any]]:
+        """Find state transitions that match the given test step action."""
+        matching_transitions = []
+        
+        for transition in self.state_transitions:
+            action = transition.get('action', {})
+            
+            # Match by action type and target selector
+            if (action.get('type') == step.action and 
+                action.get('target') == step.selector):
+                matching_transitions.append(transition)
+        
+        return matching_transitions
+
+    def _find_path_to_state(self, target_state: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Find a sequence of actions to reach the target state from base URL.
+        
+        Args:
+            target_state: State fingerprint to reach
+             
+        Returns:
+            List of transitions forming a path to the target state, or None if no path found
+        """
+        # Simple BFS to find shortest path to target state
+        from collections import deque
+        
+        # Find initial state (base URL state)
+        initial_state = self._find_base_state()
+        
+        if not initial_state:
+            return None
+        
+        if initial_state == target_state:
+            return []  # Already at target state
+        
+        # BFS to find path
+        queue = deque([(initial_state, [])])
+        visited = {initial_state}
+        
+        while queue:
+            current_state, path = queue.popleft()
+            
+            # Find all outgoing transitions from current state
+            for transition in self.state_transitions:
+                if (transition['from_state'] == current_state and 
+                    transition.get('success', True)):  # Only successful transitions
+                    
+                    next_state = transition['to_state']
+                    new_path = path + [transition]
+                    
+                    if next_state == target_state:
+                        return new_path  # Found path to target
+                    
+                    if next_state not in visited:
+                        visited.add(next_state)
+                        queue.append((next_state, new_path))
+        
+        return None  # No path found
+
+    def _validate_state_coverage(self) -> Dict[str, Any]:
+        """
+        Validate that all discovered states are covered by tests.
+        
+        Returns:
+            Coverage report with statistics
+        """
+        total_states = len(self.discovered_states)
+        covered_states = len(self.covered_states)
+        uncovered_states = self._get_uncovered_states()
+        
+        coverage_percentage = (covered_states / total_states * 100) if total_states > 0 else 100
+        
+        coverage_report = {
+            'total_states': total_states,
+            'covered_states': covered_states,
+            'uncovered_states': len(uncovered_states),
+            'coverage_percentage': coverage_percentage,
+            'uncovered_state_list': uncovered_states[:5],  # First 5 uncovered states
+            'is_complete': len(uncovered_states) == 0
+        }
+        
+        if uncovered_states:
+            logger.warning(f"⚠️ {len(uncovered_states)} states remain uncovered:")
+            for state_fp in uncovered_states[:3]:  # Show first 3
+                state_data = self.discovered_states[state_fp]
+                logger.warning(f"   - {state_fp[:8]}: {state_data.get('url', 'unknown URL')} ({state_data.get('type', 'unknown')} state)")
+        else:
+            logger.info("🎉 Complete state coverage achieved!")
+        
+        return coverage_report
 
 
 # Usage example
