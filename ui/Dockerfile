@@ -59,7 +59,19 @@ logger = logging.getLogger(__name__)
 # Mount the built React app
 ui_dist_path = Path("/app/ui/dist")
 if ui_dist_path.exists():
-    demo_app.mount("/static", StaticFiles(directory=str(ui_dist_path)), name="static")
+    # Mount the assets directory to serve JS/CSS files at the correct path
+    assets_path = ui_dist_path / "assets"
+    if assets_path.exists():
+        demo_app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+    
+    # Serve other static files directly from the dist directory
+    @demo_app.get("/vite.svg", include_in_schema=False)
+    async def serve_vite_svg():
+        """Serve vite.svg from the dist directory"""
+        svg_path = ui_dist_path / "vite.svg"
+        if svg_path.exists():
+            return FileResponse(str(svg_path))
+        return FileResponse(str(ui_dist_path / "index.html"))
     
     @demo_app.get("/", include_in_schema=False)
     @demo_app.get("/auth", include_in_schema=False)
