@@ -714,6 +714,7 @@ test.describe('{suite.name}', () => {{
   test.beforeEach(async ({{ page: testPage }}) => {{
     page = testPage;
     await page.goto('{suite.base_url}');
+  }});
 '''
 
         # Add each test case
