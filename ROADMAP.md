@@ -140,11 +140,11 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 - [ ] Implement conditional logic and variables
 - [ ] Create test data management
 
-#### 5.3 Collaboration Features
-- [ ] Add test case sharing and collaboration
-- [ ] Implement comments and annotations
-- [ ] Create team workspace management
-- [ ] Add activity logging and audit trails
+#### 5.3 GitHub-Integrated Collaboration Features
+- [ ] Repository-based test case sharing and collaboration
+- [ ] GitHub user/team permissions integration
+- [ ] Link manual tests to specific PRs and branches
+- [ ] Add activity logging with GitHub user attribution
 
 **Deliverable**: Professional-grade test management interface
 
@@ -177,6 +177,7 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 
 ### Technology Stack
 - **Backend**: FastAPI (Python) - extends existing Qalia architecture
+- **Authentication**: GitHub OAuth 2.0 integration
 - **Frontend**: Modern JavaScript/TypeScript with WebComponents or React
 - **Real-time**: WebSockets for live action streaming
 - **Storage**: Extend existing session storage system
@@ -185,23 +186,32 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 ### API Endpoints
 ```
 GET  /ui                    - Main UI interface
-GET  /ui/sessions           - List recording sessions
-POST /ui/sessions           - Create new recording session
+GET  /auth/github           - GitHub OAuth login
+GET  /auth/callback         - GitHub OAuth callback
+GET  /auth/user             - Current user info
+POST /auth/logout           - Logout user
+
+GET  /ui/repos              - List accessible repositories
+GET  /ui/repos/{org}/{repo}/sessions - List recording sessions for repo
+POST /ui/repos/{org}/{repo}/sessions - Create new recording session
 GET  /ui/sessions/{id}      - Get session details
 PUT  /ui/sessions/{id}      - Update session
 DELETE /ui/sessions/{id}    - Delete session
 POST /ui/sessions/{id}/replay - Replay session
-GET  /ui/tests              - List generated test cases
+
+GET  /ui/repos/{org}/{repo}/tests - List test cases for repo
 POST /ui/tests              - Create/update test case
 DELETE /ui/tests/{id}       - Delete test case
 WS   /ui/recording          - Real-time recording WebSocket
 ```
 
 ### Integration Points
+- **Existing GitHub App**: Leverage existing OAuth credentials and permissions
 - **Existing BrowserManager**: Extend for UI-controlled browser sessions
 - **Existing ActionExecutor**: Reuse for action recording and replay
 - **Existing TestCaseGenerator**: Process recorded actions the same way
 - **Existing SessionManager**: Store manual sessions alongside AI sessions
+- **Repository Context**: All manual tests tied to specific GitHub repositories
 
 ---
 
