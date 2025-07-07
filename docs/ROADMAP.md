@@ -38,11 +38,11 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 - [x] Set up WebSocket connections for real-time updates
 
 #### 1.2 GitHub-Based Authentication & Security
-- [ ] Implement GitHub OAuth integration
-- [ ] Leverage existing GitHub App credentials and permissions
-- [ ] Add repository-based access control
-- [ ] Configure CORS and security headers
-- [ ] Add rate limiting and API protection
+- [x] Implement GitHub OAuth integration
+- [x] Leverage existing GitHub App credentials and permissions
+- [x] Add repository-based access control
+- [x] Configure CORS and security headers
+- [x] Add rate limiting and API protection
 
 #### 1.3 Basic UI Components
 - [ ] Create header with navigation

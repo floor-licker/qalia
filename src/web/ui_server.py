@@ -6,14 +6,19 @@ the embedded browser recording interface.
 """
 
 import os
+import time
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from urllib.parse import urlencode
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends, Cookie, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+from src.web.github_oauth import create_oauth_manager, GitHubOAuth
+from src.web.session_manager import session_manager, UserSession
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +29,30 @@ class UIServer:
     def __init__(self, app: FastAPI):
         self.app = app
         self.active_connections: Dict[str, WebSocket] = {}
+        
+        # Initialize OAuth manager (with error handling for missing config)
+        try:
+            self.oauth_manager = create_oauth_manager()
+        except ValueError as e:
+            logger.warning(f"OAuth not configured: {e}")
+            self.oauth_manager = None
+        
         self.setup_ui_routes()
         self.setup_cors()
+    
+    async def get_current_user(self, qalia_session: Optional[str] = Cookie(None)) -> Optional[UserSession]:
+        """Dependency to get current authenticated user."""
+        if not qalia_session:
+            return None
+        
+        return session_manager.get_session(qalia_session)
+    
+    async def require_auth(self, qalia_session: Optional[str] = Cookie(None)) -> UserSession:
+        """Dependency that requires authentication."""
+        current_user = await self.get_current_user(qalia_session)
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        return current_user
     
     def setup_cors(self):
         """Configure CORS for development with Vite dev server."""
@@ -76,37 +103,136 @@ class UIServer:
                 # Fallback to index.html for SPA routing
                 return FileResponse(ui_dist_path / "index.html")
         
-        # API Routes for UI functionality
-        @self.app.get("/api/auth/user")
-        async def get_current_user():
-            """Get current authenticated user info."""
-            # TODO: Implement GitHub OAuth user info
-            return {"user": None, "authenticated": False}
+        # OAuth Authentication Routes
+        @self.app.get("/api/auth/login")
+        async def github_login():
+            """Initiate GitHub OAuth login."""
+            if not self.oauth_manager:
+                raise HTTPException(status_code=500, detail="OAuth not configured")
+            
+            # Generate OAuth state for CSRF protection
+            state = session_manager.generate_oauth_state()
+            
+            # Generate GitHub OAuth URL
+            auth_url, _ = self.oauth_manager.generate_auth_url()
+            
+            # Add our state to the URL
+            auth_url += f"&state={state}"
+            
+            return {"auth_url": auth_url}
         
+        @self.app.get("/api/auth/callback")
+        async def github_callback(code: str, state: str, response: Response):
+            """Handle GitHub OAuth callback."""
+            if not self.oauth_manager:
+                raise HTTPException(status_code=500, detail="OAuth not configured")
+            
+            # Validate state to prevent CSRF
+            if not session_manager.validate_oauth_state(state):
+                raise HTTPException(status_code=400, detail="Invalid or expired state")
+            
+            # Exchange code for token
+            token_data = await self.oauth_manager.exchange_code_for_token(code, state, state)
+            if not token_data:
+                raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+            
+            # Get user info
+            user_info = await self.oauth_manager.get_user_info(token_data["access_token"])
+            if not user_info:
+                raise HTTPException(status_code=400, detail="Failed to get user info")
+            
+            # Create session
+            session = session_manager.create_session(user_info, token_data)
+            
+            # Set session cookie
+            response.set_cookie(
+                key="qalia_session",
+                value=session.session_id,
+                max_age=24 * 60 * 60,  # 24 hours
+                httponly=True,
+                secure=False,  # Set to True in production with HTTPS
+                samesite="lax"
+            )
+            
+            return RedirectResponse(url="/ui", status_code=302)
+        
+        @self.app.post("/api/auth/logout")
+        async def logout(response: Response, qalia_session: Optional[str] = Cookie(None)):
+            """Logout user."""
+            if qalia_session:
+                session_manager.delete_session(qalia_session)
+            
+            # Clear session cookie
+            response.delete_cookie(key="qalia_session")
+            
+            return {"message": "Logged out successfully"}
+        
+        @self.app.get("/api/auth/user")
+        async def get_current_user_info(qalia_session: Optional[str] = Cookie(None)):
+            """Get current authenticated user info."""
+            current_user = await self.get_current_user(qalia_session)
+            
+            if not current_user:
+                return {"user": None, "authenticated": False}
+            
+            return {
+                "user": current_user.to_dict()["user"],
+                "authenticated": True,
+                "session": {
+                    "created_at": current_user.created_at.isoformat(),
+                    "expires_at": current_user.expires_at.isoformat(),
+                    "scope": current_user.scope
+                }
+            }
+        
+        # Repository and Session Management Routes (protected)
         @self.app.get("/api/repos")
-        async def list_repositories():
+        async def list_repositories(qalia_session: Optional[str] = Cookie(None)):
             """List repositories accessible to the current user."""
-            # TODO: Implement GitHub API integration
-            return {"repositories": []}
+            current_user = await self.require_auth(qalia_session)
+            
+            if not self.oauth_manager:
+                raise HTTPException(status_code=500, detail="OAuth not configured")
+            
+            # Get user repositories using their access token
+            repositories = await self.oauth_manager.get_user_repositories(current_user.access_token)
+            
+            return {"repositories": repositories}
         
         @self.app.get("/api/repos/{owner}/{repo}/sessions")
-        async def list_recording_sessions(owner: str, repo: str):
+        async def list_recording_sessions(owner: str, repo: str, qalia_session: Optional[str] = Cookie(None)):
             """List recording sessions for a repository."""
-            # TODO: Implement session storage integration
-            return {"sessions": []}
+            current_user = await self.require_auth(qalia_session)
+            
+            # TODO: Implement session storage integration with user context
+            # For now, return empty list
+            return {"sessions": [], "repository": f"{owner}/{repo}", "user": current_user.user_login}
         
         @self.app.post("/api/repos/{owner}/{repo}/sessions")
-        async def create_recording_session(owner: str, repo: str, request: Request):
+        async def create_recording_session(owner: str, repo: str, request: Request, qalia_session: Optional[str] = Cookie(None)):
             """Create a new recording session."""
+            current_user = await self.require_auth(qalia_session)
+            
             data = await request.json()
-            # TODO: Implement session creation
-            return {"session_id": "temp-session-id", "status": "created"}
+            
+            # TODO: Implement session creation with user context
+            session_id = f"session_{current_user.user_id}_{owner}_{repo}_{int(time.time())}"
+            
+            return {
+                "session_id": session_id, 
+                "status": "created",
+                "repository": f"{owner}/{repo}",
+                "user": current_user.user_login,
+                "data": data
+            }
         
         @self.app.get("/api/repos/{owner}/{repo}/tests")
-        async def list_test_cases(owner: str, repo: str):
+        async def list_test_cases(owner: str, repo: str, qalia_session: Optional[str] = Cookie(None)):
             """List test cases for a repository."""
-            # TODO: Implement test case storage integration
-            return {"tests": []}
+            current_user = await self.require_auth(qalia_session)
+            
+            # TODO: Implement test case storage integration with user context
+            return {"tests": [], "repository": f"{owner}/{repo}", "user": current_user.user_login}
         
         # WebSocket endpoint for real-time recording
         @self.app.websocket("/ws/recording/{session_id}")
