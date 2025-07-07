@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 
 from .github_operations import GitHubManager, get_private_key
 from ..cli.main import analyze_web_app
+from .ui_server import setup_ui_server
 
 # Configure logging
 logging.basicConfig(
@@ -57,6 +58,10 @@ async def lifespan(app: FastAPI):
         )
         
         logger.info("✅ GitHub manager initialized successfully")
+        
+        # Initialize UI server
+        ui_server = setup_ui_server(app)
+        logger.info("✅ UI server initialized successfully")
             
     except Exception as e:
         logger.error(f"❌ Failed to initialize GitHub manager: {e}")

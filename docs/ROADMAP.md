@@ -32,10 +32,10 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 **Goal**: Establish core web UI infrastructure
 
 #### 1.1 Web Server Architecture
-- [ ] Create FastAPI-based web server for UI
-- [ ] Design responsive web interface layout
-- [ ] Implement basic routing and static file serving
-- [ ] Set up WebSocket connections for real-time updates
+- [x] Create FastAPI-based web server for UI
+- [x] Design responsive web interface layout
+- [x] Implement basic routing and static file serving
+- [x] Set up WebSocket connections for real-time updates
 
 #### 1.2 GitHub-Based Authentication & Security
 - [ ] Implement GitHub OAuth integration
