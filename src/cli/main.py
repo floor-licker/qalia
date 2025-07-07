@@ -17,10 +17,12 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Add current directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+current_dir = Path(__file__).parent
+root_dir = current_dir.parent.parent
+sys.path.insert(0, str(root_dir))
 
 from scripts.run_exploration import run_exploration
-from generators import TestCaseGenerator
+from src.qalia.generators import TestCaseGenerator
 import logging
 
 # Configure logging

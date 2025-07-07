@@ -18,8 +18,8 @@ import uvicorn
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 
-from github_operations import GitHubManager, get_private_key
-from main import analyze_web_app
+from .github_operations import GitHubManager, get_private_key
+from ..cli.main import analyze_web_app
 
 # Configure logging
 logging.basicConfig(

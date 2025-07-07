@@ -12,34 +12,28 @@ Key Components:
 """
 
 # Core components
-from core import BrowserManager, SessionManager, StateTracker
+from .core import BrowserManager, BrowserConfig, SessionManager
 
 # Exploration components  
-from exploration import SystematicStrategy, ElementExtractor, ActionExecutor
-
-# Configuration
-from config import ExplorationConfig, BrowserConfig
+from .exploration import SystematicStrategy, ElementExtractor, ActionExecutor
 
 # Ready-to-use explorers
-from explorers import BasicExplorer, AdvancedExplorer
+from .explorers import BasicExplorer
 
 # Reporting
-from reporting import XMLFormatter, BugAnalyzer, CoverageAnalyzer
+from .reporting import XMLFormatter, BugAnalyzer, CoverageAnalyzer
 
 __version__ = "2.0.0"
 
 __all__ = [
     # Core
-    'BrowserManager', 'SessionManager', 'StateTracker',
+    'BrowserManager', 'BrowserConfig', 'SessionManager',
     
     # Exploration
     'SystematicStrategy', 'ElementExtractor', 'ActionExecutor',
     
-    # Configuration
-    'ExplorationConfig', 'BrowserConfig',
-    
     # Explorers
-    'BasicExplorer', 'AdvancedExplorer',
+    'BasicExplorer',
     
     # Reporting
     'XMLFormatter', 'BugAnalyzer', 'CoverageAnalyzer'

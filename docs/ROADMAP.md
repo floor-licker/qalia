@@ -178,10 +178,13 @@ Extend Qalia's automated testing capabilities with an interactive UI that allows
 ### Technology Stack
 - **Backend**: FastAPI (Python) - extends existing Qalia architecture
 - **Authentication**: GitHub OAuth 2.0 integration
-- **Frontend**: Modern JavaScript/TypeScript with WebComponents or React
-- **Real-time**: WebSockets for live action streaming
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI Framework**: Mantine (component library) + Tailwind CSS
+- **State Management**: Zustand + TanStack Query (React Query)
+- **Real-time**: WebSockets with Socket.IO client
 - **Storage**: Extend existing session storage system
 - **Browser**: Playwright integration for embedding and control
+- **Build Tools**: Vite + ESBuild for fast development
 
 ### API Endpoints
 ```
