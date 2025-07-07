@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Container, Card, Title, Text, Button, Alert, Loader, Group, Avatar, Stack } from '@mantine/core'
 import { IconBrandGithub, IconLogout, IconAlertCircle } from '@tabler/icons-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 
 export function GitHubAuth() {
   const { 

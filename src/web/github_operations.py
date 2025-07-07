@@ -25,7 +25,7 @@ import jwt
 import requests
 from github import Github
 
-from workflow_generator import WorkflowGenerator
+from src.web.workflow_generator import WorkflowGenerator
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import { Stack, Group, Text, Button, Avatar, Divider, UnstyledButton } from '@mantine/core'
 import { IconHome, IconTestPipe, IconRecordMail, IconSettings, IconBrandGithub, IconLogout } from '@tabler/icons-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import { Link, useLocation } from 'react-router-dom'
 
 export function Navbar() {

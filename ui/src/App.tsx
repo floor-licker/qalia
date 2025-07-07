@@ -1,11 +1,11 @@
 import { Routes, Route } from 'react-router-dom'
 import { AppShell } from '@mantine/core'
 
-import { Navbar } from '@/components/Navbar'
-import { Dashboard } from '@/pages/Dashboard'
-import { RecordingSession } from '@/pages/RecordingSession'
-import { TestManager } from '@/pages/TestManager'
-import { GitHubAuth } from '@/components/GitHubAuth'
+import { Navbar } from './components/Navbar'
+import { Dashboard } from './pages/Dashboard'
+import { RecordingSession } from './pages/RecordingSession'
+import { TestManager } from './pages/TestManager'
+import { GitHubAuth } from './components/GitHubAuth'
 
 function App() {
   return (

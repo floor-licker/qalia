@@ -97,4 +97,16 @@ secrets.env
 *.env
 
 # Secrets
-.github/secrets.env 
+.github/secrets.env
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# UI build artifacts
+ui/dist/
+ui/build/ 
