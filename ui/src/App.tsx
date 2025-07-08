@@ -9,7 +9,7 @@ import { TestManager } from './pages/TestManager'
 import { GitHubAuth } from './components/GitHubAuth'
 import { useAuthStore } from './stores/authStore'
 
-export function App() {
+function App() {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
 
   // Check authentication status when app loads
@@ -47,4 +47,6 @@ export function App() {
       </AppShell.Main>
     </AppShell>
   )
-} 
+}
+
+export default App

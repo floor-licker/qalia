@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 
-import { App } from './App'
+import App from './App'
 import { theme } from './theme'
 
 // Import Mantine styles
