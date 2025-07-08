@@ -95,7 +95,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         
         # Long timeouts for OAuth and API calls
-        proxy_timeout 60s;
         proxy_read_timeout 60s;
         proxy_send_timeout 60s;
         proxy_connect_timeout 10s;
@@ -128,7 +127,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         
         # Standard timeouts for UI
-        proxy_timeout 30s;
         proxy_read_timeout 30s;
         proxy_send_timeout 30s;
         proxy_connect_timeout 5s;

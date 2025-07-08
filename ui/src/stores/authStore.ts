@@ -6,6 +6,7 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  lastAuthCheck: number | null
   
   // Actions
   setUser: (user: User | null) => void
@@ -17,11 +18,12 @@ interface AuthState {
   clearError: () => void
 }
 
-export const useAuthStore = create<AuthState>()((set, _get) => ({
+export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  lastAuthCheck: null,
 
   setUser: (user) => {
     set({ 
@@ -101,8 +103,23 @@ export const useAuthStore = create<AuthState>()((set, _get) => ({
   },
 
   checkAuth: async () => {
+    const state = get()
+    const now = Date.now()
+    
+    // Circuit breaker: prevent requests within 5 seconds of last check
+    if (state.lastAuthCheck && (now - state.lastAuthCheck) < 5000) {
+      console.log('🔄 Skipping auth check - too recent (circuit breaker)')
+      return
+    }
+    
+    // Prevent multiple concurrent requests
+    if (state.isLoading) {
+      console.log('🔄 Skipping auth check - already in progress')
+      return
+    }
+    
     try {
-      set({ isLoading: true, error: null })
+      set({ isLoading: true, error: null, lastAuthCheck: now })
       
       // Check current authentication status
       const response = await fetch('/api/auth/user', {

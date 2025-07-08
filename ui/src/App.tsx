@@ -12,10 +12,10 @@ import { useAuthStore } from './stores/authStore'
 function App() {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
 
-  // Check authentication status when app loads
+  // Check authentication status when app loads (only once)
   useEffect(() => {
     checkAuth()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [checkAuth])
 
   if (isLoading) {
     return (

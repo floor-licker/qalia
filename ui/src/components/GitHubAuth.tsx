@@ -1,15 +1,12 @@
-import { Container, Card, Title, Text, Button, Alert, Loader, Group, Avatar, Stack } from '@mantine/core'
-import { IconBrandGithub, IconLogout, IconAlertCircle } from '@tabler/icons-react'
+import { Container, Card, Title, Text, Button, Alert, Loader, Group, Stack } from '@mantine/core'
+import { IconBrandGithub, IconAlertCircle } from '@tabler/icons-react'
 import { useAuthStore } from '../stores/authStore'
 
 export function GitHubAuth() {
   const { 
-    user, 
-    isAuthenticated, 
     isLoading, 
     error, 
     login, 
-    logout, 
     clearError 
   } = useAuthStore()
 
@@ -25,15 +22,7 @@ export function GitHubAuth() {
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      clearError()
-      await logout()
-    } catch (err) {
-      // Error is already handled in the store
-      console.error('Logout failed:', err)
-    }
-  }
+
 
   if (isLoading) {
     return (
@@ -48,42 +37,8 @@ export function GitHubAuth() {
     )
   }
 
-  if (isAuthenticated && user) {
-    return (
-      <Container size="sm" py="xl">
-        <Card shadow="sm" padding="xl" radius="md" withBorder>
-          <Stack align="center" gap="md">
-            <Avatar src={user.avatar_url} size="xl" radius="md" />
-            
-            <div style={{ textAlign: 'center' }}>
-              <Title order={2}>{user.name || user.login}</Title>
-              <Text c="dimmed">@{user.login}</Text>
-              {user.email && <Text size="sm" c="dimmed">{user.email}</Text>}
-            </div>
-
-            <Alert 
-              icon={<IconBrandGithub size={16} />} 
-              color="green" 
-              variant="light"
-              style={{ width: '100%' }}
-            >
-              Successfully authenticated with GitHub
-            </Alert>
-
-            <Button 
-              leftSection={<IconLogout size={16} />}
-              variant="light" 
-              color="red"
-              onClick={handleLogout}
-              loading={isLoading}
-            >
-              Sign Out
-            </Button>
-          </Stack>
-        </Card>
-      </Container>
-    )
-  }
+  // Note: This component should only render when NOT authenticated
+  // The authenticated state is handled by App.tsx routing
 
   return (
     <Container size="sm" py="xl">
