@@ -40,13 +40,16 @@ jobs:
           git fetch origin
           git reset --hard origin/${{ github.ref_name }}
           
+          # Navigate to UI directory
+          echo "Navigating to UI directory..."
+          cd ui
+          
           # Stop existing containers
           echo "Stopping existing containers..."
-          docker-compose -f ui/docker-compose.yml down || true
+          docker-compose down || true
           
           # Build and start the UI container
           echo "Building and starting Qalia UI container..."
-          cd ui
           docker-compose up --build -d
           
           # Wait for container to be healthy

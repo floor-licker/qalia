@@ -3,7 +3,7 @@ version: '3.8'
 services:
   qalia-ui:
     build:
-      context: ./ui
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     volumes:
       # Optional: mount for development
-      - ./ui/src:/app/ui/src:ro
+      - ./src:/app/ui/src:ro
     networks:
       - qalia-network
 
