@@ -40,6 +40,10 @@ jobs:
           git fetch origin
           git reset --hard origin/${{ github.ref_name }}
           
+          # Run server setup script to ensure all dependencies are installed
+          echo "Running server setup script..."
+          bash deployment/setup-server.sh
+          
           # Navigate to UI directory
           echo "Navigating to UI directory..."
           cd ui
@@ -57,8 +61,15 @@ jobs:
           sleep 15
           
           # Check container status
+          echo "📋 Container Status:"
           docker-compose ps
+          
+          echo "📋 Container Logs:"
           docker-compose logs --tail=20
+          
+          # Verify the application is responding
+          echo "🔍 Testing application endpoints..."
+          curl -f http://localhost:8000/health || echo "❌ Health check failed"
           
           # Update systemd service to manage Docker container
           echo "Updating systemd service for Docker container..."
@@ -90,7 +101,15 @@ jobs:
           systemctl start qalia-ui
           systemctl status qalia-ui --no-pager
           
-          echo "Deployment completed successfully!"
+          # Final verification
+          echo "🔍 Final verification..."
+          echo "Testing local application (port 8000):"
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "❌ Local health check failed"
+          
+          echo "Testing nginx proxy (port 80):"
+          curl -s -o /dev/null -w "%{http_code}" http://localhost/health || echo "❌ Nginx proxy health check failed"
+          
+          echo "✅ Deployment completed successfully!"
 
     - name: Health Check
       run: |

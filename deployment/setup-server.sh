@@ -26,6 +26,9 @@ if ! command -v docker-compose &> /dev/null; then
     echo "🐳 Installing Docker Compose..."
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
+    echo "✅ Docker Compose installed successfully"
+else
+    echo "✅ Docker Compose already installed"
 fi
 
 # Create application directory if it doesn't exist
@@ -134,11 +137,22 @@ server {
 EOF
 
 # Enable Nginx site
+echo "🔧 Enabling Qalia nginx site..."
 ln -sf /etc/nginx/sites-available/qalia /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
+
+echo "🔍 Testing nginx configuration..."
 nginx -t
+
+echo "🔄 Restarting nginx..."
 systemctl enable nginx
 systemctl restart nginx
+
+echo "✅ Nginx configuration applied successfully"
+
+# Verify nginx is serving the correct configuration
+echo "📋 Active nginx sites:"
+ls -la /etc/nginx/sites-enabled/
 
 # Enable systemd service
 systemctl daemon-reload
