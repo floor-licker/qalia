@@ -1,0 +1,3 @@
+Deployment test - Force new deployment at $(date)
+This file is used to trigger GitHub Actions deployment
+Current timestamp: 2025-07-08 17:47 UTC 

@@ -41,8 +41,33 @@ jobs:
           git reset --hard origin/${{ github.ref_name }}
           
           # Run server setup script to ensure all dependencies are installed
-          echo "Running server setup script..."
-          bash deployment/setup-server.sh
+          echo "🔧 Running server setup script..."
+          if bash deployment/setup-server.sh; then
+            echo "✅ Server setup completed successfully"
+          else
+            echo "❌ Server setup failed!"
+            exit 1
+          fi
+          
+          # Verify setup was successful
+          echo "🔍 Verifying server setup..."
+          docker-compose --version || { echo "❌ Docker Compose not found"; exit 1; }
+          
+          echo "📋 Checking nginx configuration..."
+          ls -la /etc/nginx/sites-enabled/ || { echo "❌ Nginx sites directory not accessible"; exit 1; }
+          
+          if [ -f /etc/nginx/sites-enabled/qalia ]; then
+            echo "✅ Qalia nginx config is enabled"
+            echo "📄 Qalia config content:"
+            head -20 /etc/nginx/sites-enabled/qalia
+          else
+            echo "❌ Qalia nginx config not found!"
+            echo "Available configs:"
+            ls -la /etc/nginx/sites-enabled/
+          fi
+          
+          echo "🔍 Testing nginx configuration..."
+          nginx -t || { echo "❌ Nginx config test failed"; exit 1; }
           
           # Navigate to UI directory
           echo "Navigating to UI directory..."
