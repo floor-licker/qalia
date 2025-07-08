@@ -48,7 +48,6 @@ headless_screenshot.png
 # Session data and exploration results (can be regenerated)
 exploration_sessions/
 site_maps/
-*.json
 qa_results.json
 state_store.json
 coordinated_results.json
