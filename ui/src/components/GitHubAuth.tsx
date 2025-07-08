@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Container, Card, Title, Text, Button, Alert, Loader, Group, Avatar, Stack } from '@mantine/core'
 import { IconBrandGithub, IconLogout, IconAlertCircle } from '@tabler/icons-react'
 import { useAuthStore } from '../stores/authStore'
@@ -11,14 +10,10 @@ export function GitHubAuth() {
     error, 
     login, 
     logout, 
-    checkAuth, 
     clearError 
   } = useAuthStore()
 
-  // Check authentication status on component mount
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+  // Note: App.tsx handles the initial checkAuth, so we don't need to call it here
 
   const handleLogin = async () => {
     try {
