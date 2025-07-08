@@ -7,13 +7,12 @@ This doesn't include all the complex qalia dependencies.
 """
 
 import os
-import time
 import secrets
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Optional
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
+import httpx
 
 import uvicorn
 from fastapi import FastAPI, Request, Cookie, Response, HTTPException
@@ -25,25 +24,114 @@ from fastapi.middleware.cors import CORSMiddleware
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Simple in-memory session storage for demo
+# GitHub OAuth Configuration
+GITHUB_CLIENT_ID = "Ov23lic8QQdOIc5gxuHz"
+GITHUB_CLIENT_SECRET = "18573be035c9560fea614f37a7bf8c709f11bf31"
+GITHUB_REDIRECT_URI = "http://157.245.241.244/api/auth/github/callback"
+
+# Simple in-memory session storage
 sessions = {}
 oauth_states = {}
 
-class DemoOAuth:
-    """Simple OAuth demo that doesn't actually connect to GitHub"""
+class GitHubOAuth:
+    """Real GitHub OAuth implementation"""
+    
+    def __init__(self):
+        self.client_id = GITHUB_CLIENT_ID
+        self.client_secret = GITHUB_CLIENT_SECRET
+        self.redirect_uri = GITHUB_REDIRECT_URI
+        self.scope = "repo user:email"
     
     def generate_auth_url(self):
-        # For demo purposes, just return a mock URL
-        return "https://github.com/login/oauth/authorize?client_id=demo&redirect_uri=http://localhost:8000/api/auth/callback&scope=repo%20user:email&state=demo_state", "demo_state"
+        """Generate real GitHub OAuth authorization URL"""
+        state = secrets.token_urlsafe(32)
+        
+        # Store state for validation
+        oauth_states[state] = {
+            "created_at": datetime.utcnow(),
+            "expires_at": datetime.utcnow() + timedelta(minutes=10)
+        }
+        
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "scope": self.scope,
+            "state": state,
+            "allow_signup": "true"
+        }
+        
+        auth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
+        return auth_url, state
+    
+    async def exchange_code_for_token(self, code: str):
+        """Exchange authorization code for access token"""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://github.com/login/oauth/access_token",
+                headers={"Accept": "application/json"},
+                data={
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "code": code,
+                    "redirect_uri": self.redirect_uri
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+            
+            token_data = response.json()
+            
+            if "error" in token_data:
+                raise HTTPException(status_code=400, detail=token_data.get("error_description", "OAuth error"))
+            
+            return token_data.get("access_token")
+    
+    async def get_user_info(self, access_token: str):
+        """Get user information from GitHub API"""
+        async with httpx.AsyncClient() as client:
+            # Get user info
+            user_response = await client.get(
+                "https://api.github.com/user",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            )
+            
+            if user_response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to get user info")
+            
+            user_data = user_response.json()
+            
+            # Get user emails
+            emails_response = await client.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            )
+            
+            emails = []
+            if emails_response.status_code == 200:
+                emails = emails_response.json()
+                # Find primary email
+                primary_email = next((email["email"] for email in emails if email["primary"]), None)
+                if primary_email:
+                    user_data["email"] = primary_email
+            
+            return user_data
 
-def create_demo_session(user_data):
-    """Create a demo session"""
+def create_session(user_data, access_token):
+    """Create a session"""
     session_id = secrets.token_urlsafe(32)
     now = datetime.utcnow()
     
     sessions[session_id] = {
         "session_id": session_id,
         "user": user_data,
+        "access_token": access_token,
         "created_at": now,
         "expires_at": now + timedelta(hours=24),
         "last_activity": now
@@ -65,86 +153,75 @@ def get_session(session_id: str):
     return session
 
 # Create FastAPI app
-app = FastAPI(title="Qalia UI Demo")
+app = FastAPI(title="Qalia UI")
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://157.245.241.244", "http://localhost:3000", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve UI - redirect to Vite dev server in development
-@app.get("/ui", response_class=HTMLResponse)
-async def serve_ui():
-    return HTMLResponse("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Qalia UI - Development Mode</title>
-            <script>
-                // Redirect to Vite dev server
-                window.location.href = 'http://localhost:3000';
-            </script>
-        </head>
-        <body>
-            <p>Redirecting to development server...</p>
-            <p>If not redirected, please visit <a href="http://localhost:3000">http://localhost:3000</a></p>
-        </body>
-        </html>
-    """)
+# Initialize GitHub OAuth
+github_oauth = GitHubOAuth()
 
-# OAuth Routes (simplified for demo)
+# OAuth Routes
 @app.get("/api/auth/login")
 async def github_login():
-    """Demo login - returns mock OAuth URL"""
-    state = secrets.token_urlsafe(32)
-    oauth_states[state] = {
-        "created_at": datetime.utcnow(),
-        "expires_at": datetime.utcnow() + timedelta(minutes=10)
-    }
-    
-    # For demo, return a GitHub-like URL but with demo parameters
-    auth_url = f"http://localhost:8000/api/auth/demo-callback?code=demo_code&state={state}"
-    
-    return {"auth_url": auth_url}
+    """Initiate GitHub OAuth login"""
+    try:
+        auth_url, state = github_oauth.generate_auth_url()
+        return {"auth_url": auth_url}
+    except Exception as e:
+        logger.error(f"Failed to generate auth URL: {e}")
+        raise HTTPException(status_code=500, detail="Failed to initiate login")
 
-@app.get("/api/auth/demo-callback")
-async def demo_callback(code: str, state: str, response: Response):
-    """Demo callback that simulates successful OAuth"""
-    
-    # Validate state
-    if state not in oauth_states:
-        raise HTTPException(status_code=400, detail="Invalid state")
-    
-    # Remove state (one-time use)
-    del oauth_states[state]
-    
-    # Create demo user
-    demo_user = {
-        "id": "123456",
-        "login": "demo-user",
-        "name": "Demo User",
-        "email": "demo@example.com",
-        "avatar_url": "https://github.com/identicons/demo-user.png"
-    }
-    
-    # Create session
-    session_id = create_demo_session(demo_user)
-    
-    # Set cookie
-    response.set_cookie(
-        key="qalia_session",
-        value=session_id,
-        max_age=24 * 60 * 60,
-        httponly=True,
-        secure=False,
-        samesite="lax"
-    )
-    
-    return RedirectResponse(url="http://localhost:3000", status_code=302)
+@app.get("/api/auth/github/callback")
+async def github_callback(code: str, state: str, response: Response):
+    """Handle GitHub OAuth callback"""
+    try:
+        # Validate state
+        if state not in oauth_states:
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        # Check if state is expired
+        state_data = oauth_states[state]
+        if datetime.utcnow() > state_data["expires_at"]:
+            del oauth_states[state]
+            raise HTTPException(status_code=400, detail="State parameter expired")
+        
+        # Remove state (one-time use)
+        del oauth_states[state]
+        
+        # Exchange code for access token
+        access_token = await github_oauth.exchange_code_for_token(code)
+        
+        # Get user information
+        user_data = await github_oauth.get_user_info(access_token)
+        
+        # Create session
+        session_id = create_session(user_data, access_token)
+        
+        # Set secure cookie
+        response.set_cookie(
+            key="qalia_session",
+            value=session_id,
+            max_age=24 * 60 * 60,
+            httponly=True,
+            secure=True,  # Enable for HTTPS
+            samesite="lax"
+        )
+        
+        # Redirect to frontend
+        return RedirectResponse(url="http://157.245.241.244", status_code=302)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
 
 @app.post("/api/auth/logout")
 async def logout(response: Response, qalia_session: Optional[str] = Cookie(None)):
@@ -175,75 +252,74 @@ async def get_user(qalia_session: Optional[str] = Cookie(None)):
 
 @app.get("/api/repos")
 async def list_repos(qalia_session: Optional[str] = Cookie(None)):
-    """Demo repositories list"""
+    """List user's GitHub repositories"""
     session = get_session(qalia_session)
     
     if not session:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    # Return demo repositories
-    demo_repos = [
-        {
-            "id": 1,
-            "name": "my-web-app",
-            "full_name": "demo-user/my-web-app",
-            "description": "A demo web application for testing",
-            "private": False,
-            "html_url": "https://github.com/demo-user/my-web-app",
-            "clone_url": "https://github.com/demo-user/my-web-app.git",
-            "default_branch": "main",
-            "language": "JavaScript",
-            "stargazers_count": 42,
-            "forks_count": 7,
-            "permissions": {"admin": True, "push": True, "pull": True},
-            "owner": {
-                "login": "demo-user",
-                "avatar_url": "https://github.com/identicons/demo-user.png",
-                "type": "User"
-            }
-        },
-        {
-            "id": 2,
-            "name": "qalia-tests",
-            "full_name": "demo-user/qalia-tests",
-            "description": "Test repository for Qalia testing",
-            "private": True,
-            "html_url": "https://github.com/demo-user/qalia-tests",
-            "clone_url": "https://github.com/demo-user/qalia-tests.git",
-            "default_branch": "main",
-            "language": "TypeScript",
-            "stargazers_count": 15,
-            "forks_count": 2,
-            "permissions": {"admin": True, "push": True, "pull": True},
-            "owner": {
-                "login": "demo-user",
-                "avatar_url": "https://github.com/identicons/demo-user.png",
-                "type": "User"
-            }
-        }
-    ]
-    
-    return {"repositories": demo_repos}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.github.com/user/repos",
+                headers={
+                    "Authorization": f"Bearer {session['access_token']}",
+                    "Accept": "application/vnd.github.v3+json"
+                },
+                params={
+                    "visibility": "all",
+                    "sort": "updated",
+                    "per_page": 50
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch repositories")
+            
+            return response.json()
+            
+    except Exception as e:
+        logger.error(f"Failed to fetch repositories: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch repositories")
 
+# Health check
 @app.get("/health")
 async def health():
-    """Health check"""
+    """Health check endpoint"""
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "sessions": len(sessions)
+        "service": "qalia-ui",
+        "oauth": "github-production"
     }
 
+# Serve static files (built frontend) - AFTER API routes to avoid conflicts
+app.mount("/assets", StaticFiles(directory="ui/dist/assets"), name="assets")
+
+# Serve favicon
+@app.get("/vite.svg")
+async def serve_favicon():
+    return FileResponse("ui/dist/vite.svg")
+
+# Serve main HTML file - catch-all route MUST be last
+@app.get("/", response_class=HTMLResponse)
+@app.get("/{path:path}", response_class=HTMLResponse)
+async def serve_frontend(path: str = ""):
+    """Serve the React frontend"""
+    try:
+        return FileResponse("ui/dist/index.html")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Frontend not built")
+
 if __name__ == "__main__":
-    print("🚀 Starting Qalia UI Demo Server")
-    print("📍 Backend: http://localhost:8000")
-    print("📍 Frontend: http://localhost:3000 (start separately)")
-    print("📍 Health: http://localhost:8000/health")
-    print("")
-    print("💡 To test OAuth flow:")
-    print("   1. Visit http://localhost:3000")
-    print("   2. Click 'Sign in with GitHub'")
-    print("   3. You'll be redirected to a demo OAuth flow")
-    print("")
+    logger.info("🚀 Starting Qalia UI with GitHub OAuth")
+    logger.info(f"📍 Application: http://157.245.241.244")
+    logger.info(f"📍 OAuth Callback: {GITHUB_REDIRECT_URI}")
+    logger.info("🔐 Using production GitHub OAuth")
     
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info") 
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="info"
+    ) 
