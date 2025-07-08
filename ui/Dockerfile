@@ -16,6 +16,8 @@ COPY ui/index.html ./
 COPY ui/vite.config.ts ./
 COPY ui/tsconfig.json ./
 COPY ui/tsconfig.node.json ./
+COPY ui/postcss.config.js ./
+COPY ui/tailwind.config.js ./
 
 # Build the application
 RUN npm run build
