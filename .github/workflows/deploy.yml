@@ -1,4 +1,4 @@
-name: Deploy to DigitalOcean
+name: Deploy Qalia UI to DigitalOcean
 
 on:
   push:
@@ -14,29 +14,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run tests (if any)
-      run: |
-        # Add your test commands here
-        echo "Running tests..."
-        # python -m pytest tests/ || true
-
     - name: Debug secrets
       run: |
         echo "DO_HOST exists: ${{ secrets.DO_HOST != '' }}"
         echo "DO_USERNAME exists: ${{ secrets.DO_USERNAME != '' }}"
         echo "DO_SSH_KEY exists: ${{ secrets.DO_SSH_KEY != '' }}"
         
-    - name: Deploy to DigitalOcean
+    - name: Deploy Qalia UI to DigitalOcean
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.DO_HOST }}
@@ -56,29 +40,58 @@ jobs:
           git fetch origin
           git reset --hard origin/${{ github.ref_name }}
           
-          # Update Python dependencies
-          echo "Updating dependencies..."
-          source venv/bin/activate || {
-            echo "Creating virtual environment..."
-            python3.12 -m venv venv
-            source venv/bin/activate
-          }
+          # Stop existing containers
+          echo "Stopping existing containers..."
+          docker-compose -f ui/docker-compose.yml down || true
           
-          pip install -r requirements.txt
+          # Build and start the UI container
+          echo "Building and starting Qalia UI container..."
+          cd ui
+          docker-compose up --build -d
           
-          # Update Playwright if needed
-          playwright install
+          # Wait for container to be healthy
+          echo "Waiting for container to start..."
+          sleep 15
           
-          # Restart the service
-          echo "Restarting Qalia service..."
+          # Check container status
+          docker-compose ps
+          docker-compose logs --tail=20
+          
+          # Update systemd service to manage Docker container
+          echo "Updating systemd service for Docker container..."
+          cat > /etc/systemd/system/qalia-ui.service << 'EOF'
+          [Unit]
+          Description=Qalia UI Docker Container
+          After=docker.service
+          Requires=docker.service
+          
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          WorkingDirectory=/opt/qalia/ui
+          ExecStart=/usr/bin/docker-compose up -d
+          ExecStop=/usr/bin/docker-compose down
+          Restart=no
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Stop old Python service if it exists
+          systemctl stop qalia || true
+          systemctl disable qalia || true
+          
+          # Enable and start new Docker service
           systemctl daemon-reload
-          systemctl restart qalia
-          systemctl status qalia --no-pager
+          systemctl enable qalia-ui
+          systemctl start qalia-ui
+          systemctl status qalia-ui --no-pager
           
           echo "Deployment completed successfully!"
 
     - name: Health Check
       run: |
         echo "Waiting for service to start..."
-        sleep 10
-        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting" 
+        sleep 20
+        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting"
+        curl -f http://${{ secrets.DO_HOST }}/api/auth/user || echo "Auth API check failed - service may still be starting" 
