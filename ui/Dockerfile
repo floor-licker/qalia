@@ -4,13 +4,18 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /app/ui
 
 # Copy package files
-COPY package*.json ./
+COPY ui/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy source code (exclude node_modules and other build artifacts)
+COPY ui/src ./src
+COPY ui/public ./public
+COPY ui/index.html ./
+COPY ui/vite.config.ts ./
+COPY ui/tsconfig.json ./
+COPY ui/tsconfig.node.json ./
 
 # Build the application
 RUN npm run build
@@ -26,11 +31,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python requirements and install dependencies
-COPY ../requirements.txt ./
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the demo server
-COPY ui_demo_server.py ./
+COPY ui/ui_demo_server.py ./
 
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/ui/dist ./ui/dist
