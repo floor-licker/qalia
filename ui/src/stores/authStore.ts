@@ -126,6 +126,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     
     try {
       console.log('🔍 Checking authentication status...')
+      console.log('🍪 Current cookies:', document.cookie)
       set({ isLoading: true, error: null, lastAuthCheck: now })
       
       // Check current authentication status
@@ -140,7 +141,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
       
       const data: AuthResponse = await response.json()
-      console.log('📝 Auth check data:', { authenticated: data.authenticated, user: data.user?.login })
+      console.log('📝 Auth check data:', data)
+      console.log('📝 Auth check summary:', { authenticated: data.authenticated, user: data.user?.login })
       
       set({
         user: data.user,
