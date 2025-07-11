@@ -79,30 +79,45 @@ class GitHubOAuth:
     
     async def exchange_code_for_token(self, code: str):
         """Exchange authorization code for access token."""
+        logger.info(f"🔄 Exchanging code for token...")
+        logger.info(f"🔧 Using client_id: {self.client_id}")
+        logger.info(f"🔧 Using redirect_uri: {self.redirect_uri}")
+        
         async with httpx.AsyncClient() as client:
+            token_request = {
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "code": code,
+                "redirect_uri": self.redirect_uri
+            }
+            
             response = await client.post(
                 "https://github.com/login/oauth/access_token",
                 headers={"Accept": "application/json"},
-                data={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "code": code,
-                    "redirect_uri": self.redirect_uri
-                }
+                data=token_request
             )
             
+            logger.info(f"📡 GitHub token response status: {response.status_code}")
+            
             if response.status_code != 200:
-                raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+                logger.error(f"❌ Token exchange failed with status {response.status_code}")
+                logger.error(f"❌ Response: {response.text}")
+                raise HTTPException(status_code=400, detail=f"Failed to exchange code for token: {response.status_code}")
             
             token_data = response.json()
+            logger.info(f"📝 Token response data keys: {list(token_data.keys())}")
             
             if "error" in token_data:
-                raise HTTPException(status_code=400, detail=token_data.get("error_description", "OAuth error"))
+                error_desc = token_data.get("error_description", "OAuth error")
+                logger.error(f"❌ GitHub OAuth error: {token_data.get('error')} - {error_desc}")
+                raise HTTPException(status_code=400, detail=error_desc)
             
             access_token = token_data.get("access_token")
             if not access_token:
+                logger.error(f"❌ No access token in response: {token_data}")
                 raise HTTPException(status_code=400, detail="No access token received")
             
+            logger.info(f"✅ Successfully obtained access token")
             return access_token
     
     async def get_user_info(self, access_token: str):
@@ -227,21 +242,31 @@ async def github_login():
 async def github_callback(code: str, state: str, response: Response):
     """Handle GitHub OAuth callback."""
     try:
-        logger.info("GitHub OAuth callback received")
+        logger.info(f"🔗 GitHub OAuth callback received")
+        logger.info(f"📝 Code: {code[:10]}...") 
+        logger.info(f"📝 State: {state[:10]}...")
         
         # Basic state validation (can be enhanced)
         if state not in oauth_states:
-            logger.warning(f"Invalid state parameter: {state[:8]}...")
+            logger.warning(f"⚠️  Invalid state parameter: {state[:8]}...")
+            logger.info(f"📝 Available states: {list(oauth_states.keys())}")
             # In development, allow it to proceed
+        else:
+            logger.info(f"✅ State validation passed")
         
         # Exchange code for access token
+        logger.info(f"🔄 Starting token exchange...")
         access_token = await github_oauth.exchange_code_for_token(code)
         
         # Get user information
+        logger.info(f"👤 Getting user information...")
         user_data = await github_oauth.get_user_info(access_token)
+        logger.info(f"👤 User: {user_data.get('login', 'unknown')} ({user_data.get('id', 'no-id')})")
         
         # Create session
+        logger.info(f"🍪 Creating session...")
         session_id = create_session(user_data, access_token)
+        logger.info(f"🍪 Session created: {session_id[:10]}...")
         
         # Set session cookie
         response.set_cookie(
@@ -252,14 +277,19 @@ async def github_callback(code: str, state: str, response: Response):
             secure=False,
             samesite="lax"
         )
+        logger.info(f"🍪 Session cookie set")
         
         # Redirect to UI
+        logger.info(f"↩️  Redirecting to main page")
         return RedirectResponse(url="/", status_code=302)
         
     except HTTPException as e:
+        logger.error(f"❌ OAuth callback HTTPException: {e.detail}")
         raise
     except Exception as e:
-        logger.error(f"OAuth callback error: {e}")
+        logger.error(f"❌ OAuth callback error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Authentication failed")
 
 
