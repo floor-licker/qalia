@@ -3,8 +3,8 @@ version: '3.8'
 services:
   qalia-ui:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: ui/Dockerfile
     ports:
       - "8000:8000"
     environment:
