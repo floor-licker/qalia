@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # GitHub OAuth Configuration
 GITHUB_CLIENT_ID = os.getenv("GITHUB_OAUTH_CLIENT_ID", "Ov23lic8QQdOIc5gxuHz")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_OAUTH_CLIENT_SECRET", "18573be035c9560fea614f37a7bf8c709f11bf31")
-GITHUB_REDIRECT_URI = os.getenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
+GITHUB_REDIRECT_URI = os.getenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/auth/github/callback")
 
 # Simple in-memory storage (in production, use proper database)
 sessions = {}
@@ -223,7 +223,7 @@ async def github_login():
         raise HTTPException(status_code=500, detail="Failed to initiate login")
 
 
-@app.get("/api/auth/callback")
+@app.get("/api/auth/github/callback")
 async def github_callback(code: str, state: str, response: Response):
     """Handle GitHub OAuth callback."""
     try:
