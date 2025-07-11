@@ -14,7 +14,7 @@ interface AuthState {
   setError: (error: string | null) => void
   login: () => Promise<void>
   logout: () => Promise<void>
-  checkAuth: () => Promise<void>
+  checkAuth: (force?: boolean) => Promise<void>
   clearError: () => void
 }
 
@@ -108,12 +108,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
   },
 
-  checkAuth: async () => {
+  checkAuth: async (force = false) => {
     const state = get()
     const now = Date.now()
     
-    // Circuit breaker: prevent requests within 5 seconds of last check
-    if (state.lastAuthCheck && (now - state.lastAuthCheck) < 5000) {
+    // Circuit breaker: prevent requests within 5 seconds of last check (unless forced)
+    if (!force && state.lastAuthCheck && (now - state.lastAuthCheck) < 5000) {
       console.log('🔄 Skipping auth check - too recent (circuit breaker)')
       return
     }

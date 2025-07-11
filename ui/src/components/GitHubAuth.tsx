@@ -1,4 +1,4 @@
-import { Container, Card, Title, Text, Button, Alert, Loader, Group, Stack } from '@mantine/core'
+import { Container, Card, Title, Text, Button, Alert, Loader, Group, Stack, Code } from '@mantine/core'
 import { IconBrandGithub, IconAlertCircle } from '@tabler/icons-react'
 import { useAuthStore } from '../stores/authStore'
 
@@ -7,7 +7,10 @@ export function GitHubAuth() {
     isLoading, 
     error, 
     login, 
-    clearError 
+    clearError,
+    checkAuth,
+    user,
+    isAuthenticated
   } = useAuthStore()
 
   // Note: App.tsx handles the initial checkAuth, so we don't need to call it here
@@ -20,6 +23,11 @@ export function GitHubAuth() {
       // Error is already handled in the store
       console.error('Login failed:', err)
     }
+  }
+
+  const handleRefreshAuth = async () => {
+    console.log('🔄 Manual auth refresh requested...')
+    await checkAuth(true)
   }
 
 
@@ -64,19 +72,47 @@ export function GitHubAuth() {
             </Alert>
           )}
 
-          <Button 
-            leftSection={<IconBrandGithub size={16} />}
-            size="lg"
-            onClick={handleLogin}
-            loading={isLoading}
-          >
-            Sign in with GitHub
-          </Button>
+          <Group>
+            <Button 
+              leftSection={<IconBrandGithub size={16} />}
+              size="lg"
+              onClick={handleLogin}
+              loading={isLoading}
+            >
+              Sign in with GitHub
+            </Button>
+            
+            <Button 
+              variant="light"
+              onClick={handleRefreshAuth}
+              loading={isLoading}
+            >
+              Refresh
+            </Button>
+          </Group>
 
           <Text size="xs" c="dimmed" style={{ textAlign: 'center' }}>
             Qalia will access your GitHub repositories to help you<br />
             create and manage automated test cases.
           </Text>
+
+          {/* Debug info */}
+          <Card withBorder style={{ width: '100%', marginTop: '20px' }}>
+            <Text size="sm" fw={500} mb="xs">Debug Info:</Text>
+            <Code block>
+              {JSON.stringify({
+                isAuthenticated,
+                isLoading,
+                hasUser: !!user,
+                userName: user?.login || 'none',
+                error: error || 'none',
+                timestamp: new Date().toISOString()
+              }, null, 2)}
+            </Code>
+            <Text size="xs" c="dimmed" mt="xs">
+              If you just signed in but still see this page, try clicking "Refresh"
+            </Text>
+          </Card>
         </Stack>
       </Card>
     </Container>

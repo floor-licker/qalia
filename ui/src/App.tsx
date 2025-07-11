@@ -12,10 +12,24 @@ import { useAuthStore } from './stores/authStore'
 function App() {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
 
-  // Check authentication status when app loads (only once)
+  // Check authentication status when app loads (force initial check)
   useEffect(() => {
-    checkAuth()
+    console.log('🚀 App mounted - checking authentication...')
+    checkAuth(true) // Force initial auth check to bypass circuit breaker
   }, [checkAuth])
+
+  // Also check auth when user might be returning from OAuth
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isAuthenticated) {
+        console.log('🔄 Page became visible - checking auth in case user returned from OAuth...')
+        checkAuth(true)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isAuthenticated, checkAuth])
 
   if (isLoading) {
     return (
