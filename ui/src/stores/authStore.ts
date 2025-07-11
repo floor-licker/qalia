@@ -47,21 +47,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: async () => {
     try {
+      console.log('🔐 Starting OAuth login process...')
       set({ isLoading: true, error: null })
       
       // Get OAuth login URL from backend
+      console.log('🔄 Fetching OAuth login URL from backend...')
       const response = await fetch('/api/auth/login')
       const data = await response.json()
+      
+      console.log('📝 Login response:', { status: response.status, ok: response.ok, data })
       
       if (!response.ok) {
         throw new Error(data.detail || 'Failed to initiate login')
       }
       
       // Redirect to GitHub OAuth
+      console.log('🔗 Redirecting to GitHub OAuth:', data.auth_url)
       window.location.href = data.auth_url
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed'
+      console.error('❌ Login failed:', error)
       set({ 
         error: errorMessage,
         isLoading: false 
@@ -119,6 +125,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
     
     try {
+      console.log('🔍 Checking authentication status...')
       set({ isLoading: true, error: null, lastAuthCheck: now })
       
       // Check current authentication status
@@ -126,11 +133,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         credentials: 'include'
       })
       
+      console.log('📝 Auth check response:', { status: response.status, ok: response.ok })
+      
       if (!response.ok) {
         throw new Error('Failed to check authentication')
       }
       
       const data: AuthResponse = await response.json()
+      console.log('📝 Auth check data:', { authenticated: data.authenticated, user: data.user?.login })
       
       set({
         user: data.user,
@@ -139,7 +149,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         error: null
       })
       
+      if (data.authenticated) {
+        console.log('✅ User is authenticated:', data.user?.login)
+      } else {
+        console.log('❌ User is not authenticated')
+      }
+      
     } catch (error) {
+      console.error('❌ Auth check failed:', error)
       // If auth check fails, user is likely not authenticated
       set({
         user: null,

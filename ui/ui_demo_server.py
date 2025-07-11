@@ -61,10 +61,13 @@ class GitHubOAuth:
         }
         
         auth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
+        logger.info(f"📝 Generated state: {state[:8]}... (expires in 10 minutes)")
+        logger.info(f"📝 Stored {len(oauth_states)} states in memory")
         return auth_url, state
     
     async def exchange_code_for_token(self, code: str):
         """Exchange authorization code for access token"""
+        logger.info("🔄 Making token exchange request to GitHub...")
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://github.com/login/oauth/access_token",
@@ -77,18 +80,32 @@ class GitHubOAuth:
                 }
             )
             
+            logger.info(f"📝 Token exchange response status: {response.status_code}")
+            
             if response.status_code != 200:
+                logger.error(f"❌ Token exchange failed with status {response.status_code}")
+                logger.error(f"❌ Response: {response.text}")
                 raise HTTPException(status_code=400, detail="Failed to exchange code for token")
             
             token_data = response.json()
+            logger.info(f"📝 Token exchange response: {list(token_data.keys())}")
             
             if "error" in token_data:
+                logger.error(f"❌ OAuth error in token response: {token_data.get('error_description', 'Unknown error')}")
                 raise HTTPException(status_code=400, detail=token_data.get("error_description", "OAuth error"))
             
-            return token_data.get("access_token")
+            access_token = token_data.get("access_token")
+            if not access_token:
+                logger.error("❌ No access token in response")
+                logger.error(f"❌ Response data: {token_data}")
+                raise HTTPException(status_code=400, detail="No access token received")
+            
+            logger.info("✅ Access token received successfully")
+            return access_token
     
     async def get_user_info(self, access_token: str):
         """Get user information from GitHub API"""
+        logger.info("🔄 Fetching user info from GitHub API...")
         async with httpx.AsyncClient() as client:
             # Get user info
             user_response = await client.get(
@@ -99,12 +116,18 @@ class GitHubOAuth:
                 }
             )
             
+            logger.info(f"📝 User info response status: {user_response.status_code}")
+            
             if user_response.status_code != 200:
+                logger.error(f"❌ Failed to get user info: {user_response.status_code}")
+                logger.error(f"❌ Response: {user_response.text}")
                 raise HTTPException(status_code=400, detail="Failed to get user info")
             
             user_data = user_response.json()
+            logger.info(f"📝 User info received: {user_data.get('login', 'unknown')} (ID: {user_data.get('id', 'unknown')})")
             
             # Get user emails
+            logger.info("🔄 Fetching user emails...")
             emails_response = await client.get(
                 "https://api.github.com/user/emails",
                 headers={
@@ -113,13 +136,21 @@ class GitHubOAuth:
                 }
             )
             
+            logger.info(f"📝 Emails response status: {emails_response.status_code}")
+            
             emails = []
             if emails_response.status_code == 200:
                 emails = emails_response.json()
+                logger.info(f"📝 Found {len(emails)} email addresses")
                 # Find primary email
                 primary_email = next((email["email"] for email in emails if email["primary"]), None)
                 if primary_email:
                     user_data["email"] = primary_email
+                    logger.info(f"📝 Primary email set: {primary_email}")
+                else:
+                    logger.info("📝 No primary email found")
+            else:
+                logger.warning(f"⚠️  Failed to fetch emails: {emails_response.status_code}")
             
             return user_data
 
@@ -136,6 +167,10 @@ def create_session(user_data, access_token):
         "expires_at": now + timedelta(hours=24),
         "last_activity": now
     }
+    
+    logger.info(f"📝 Session created for user: {user_data.get('login', 'unknown')}")
+    logger.info(f"📝 Session ID: {session_id[:8]}...")
+    logger.info(f"📝 Total active sessions: {len(sessions)}")
     
     return session_id
 
@@ -172,55 +207,85 @@ github_oauth = GitHubOAuth()
 async def github_login():
     """Initiate GitHub OAuth login"""
     try:
+        logger.info("🔐 Initiating GitHub OAuth login...")
         auth_url, state = github_oauth.generate_auth_url()
+        logger.info(f"✅ Generated auth URL with state: {state[:8]}...")
+        logger.info(f"🔗 Redirecting to: {auth_url}")
         return {"auth_url": auth_url}
     except Exception as e:
-        logger.error(f"Failed to generate auth URL: {e}")
+        logger.error(f"❌ Failed to generate auth URL: {e}")
         raise HTTPException(status_code=500, detail="Failed to initiate login")
 
 @app.get("/api/auth/github/callback")
 async def github_callback(code: str, state: str, response: Response):
     """Handle GitHub OAuth callback"""
     try:
+        logger.info("🔄 GitHub OAuth callback received")
+        logger.info(f"📝 Code: {code[:10]}...")
+        logger.info(f"📝 State: {state[:8]}...")
+        logger.info(f"📝 Available states: {list(oauth_states.keys())}")
+        
         # Validate state
         if state not in oauth_states:
+            logger.error(f"❌ Invalid state parameter: {state[:8]}...")
+            logger.error(f"❌ Expected one of: {list(oauth_states.keys())}")
             raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        logger.info("✅ State validation passed")
         
         # Check if state is expired
         state_data = oauth_states[state]
         if datetime.utcnow() > state_data["expires_at"]:
+            logger.error(f"❌ State parameter expired: {state[:8]}...")
             del oauth_states[state]
             raise HTTPException(status_code=400, detail="State parameter expired")
         
+        logger.info("✅ State expiration check passed")
+        
         # Remove state (one-time use)
         del oauth_states[state]
+        logger.info("✅ State consumed successfully")
         
         # Exchange code for access token
+        logger.info("🔄 Exchanging code for access token...")
         access_token = await github_oauth.exchange_code_for_token(code)
+        logger.info(f"✅ Access token obtained: {access_token[:10]}...")
         
         # Get user information
+        logger.info("🔄 Fetching user information...")
         user_data = await github_oauth.get_user_info(access_token)
+        logger.info(f"✅ User info obtained: {user_data.get('login', 'unknown')} ({user_data.get('email', 'no email')})")
         
         # Create session
+        logger.info("🔄 Creating session...")
         session_id = create_session(user_data, access_token)
+        logger.info(f"✅ Session created: {session_id[:8]}...")
         
         # Set secure cookie
+        logger.info("🔄 Setting session cookie...")
         response.set_cookie(
             key="qalia_session",
             value=session_id,
             max_age=24 * 60 * 60,
             httponly=True,
-            secure=True,  # Enable for HTTPS
+            secure=False,  # Set to False for HTTP (True for HTTPS)
             samesite="lax"
         )
+        logger.info("✅ Session cookie set")
         
         # Redirect to frontend
-        return RedirectResponse(url="http://157.245.241.244", status_code=302)
+        redirect_url = "http://157.245.241.244"
+        logger.info(f"🔄 Redirecting to: {redirect_url}")
+        return RedirectResponse(url=redirect_url, status_code=302)
         
-    except HTTPException:
+    except HTTPException as e:
+        logger.error(f"❌ OAuth callback HTTP error: {e.detail}")
         raise
     except Exception as e:
-        logger.error(f"OAuth callback error: {e}")
+        logger.error(f"❌ OAuth callback error: {e}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Authentication failed")
 
 @app.post("/api/auth/logout")
@@ -235,11 +300,17 @@ async def logout(response: Response, qalia_session: Optional[str] = Cookie(None)
 @app.get("/api/auth/user")
 async def get_user(qalia_session: Optional[str] = Cookie(None)):
     """Get current user info"""
+    logger.info("🔍 Checking user authentication...")
+    logger.info(f"📝 Session cookie: {qalia_session[:8] if qalia_session else 'None'}...")
+    logger.info(f"📝 Active sessions: {len(sessions)}")
+    
     session = get_session(qalia_session)
     
     if not session:
+        logger.info("❌ No valid session found")
         return {"user": None, "authenticated": False}
     
+    logger.info(f"✅ Valid session found for user: {session['user'].get('login', 'unknown')}")
     return {
         "user": session["user"],
         "authenticated": True,
