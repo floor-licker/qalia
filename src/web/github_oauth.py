@@ -270,7 +270,7 @@ def get_oauth_config() -> Dict[str, str]:
     config = {
         "client_id": os.getenv("GITHUB_OAUTH_CLIENT_ID"),
         "client_secret": os.getenv("GITHUB_OAUTH_CLIENT_SECRET"),
-        "redirect_uri": os.getenv("GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
+        "redirect_uri": os.getenv("GITHUB_OAUTH_REDIRECT_URI")
     }
     
     # Validate required config

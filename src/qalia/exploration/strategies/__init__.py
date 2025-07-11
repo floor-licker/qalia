@@ -8,7 +8,6 @@ Different approaches to website exploration:
 """
 
 from .systematic import SystematicStrategy
-from .intelligent import IntelligentStrategy
-from .hybrid import HybridStrategy
+from .intelligent_agent import GPTAgent
 
-__all__ = ['SystematicStrategy', 'IntelligentStrategy', 'HybridStrategy'] 
+__all__ = ['SystematicStrategy', 'GPTAgent'] 

@@ -126,23 +126,54 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     
     try {
       console.log('🔍 Checking authentication status...')
+      console.log('🔍 Force check:', force)
+      console.log('🔍 Current auth state:', { 
+        isAuthenticated: state.isAuthenticated, 
+        user: state.user?.login || 'none',
+        lastCheck: state.lastAuthCheck ? new Date(state.lastAuthCheck).toISOString() : 'never'
+      })
       console.log('🍪 Current cookies:', document.cookie)
+      console.log('🍪 Cookie breakdown:', document.cookie.split(';').map(c => c.trim()))
+      
+      // Check for qalia_session cookie specifically
+      const qaliaCookie = document.cookie.split(';').find(c => c.trim().startsWith('qalia_session='))
+      if (qaliaCookie) {
+        console.log('🍪 Found qalia_session cookie:', qaliaCookie.split('=')[1]?.substring(0, 8) + '...')
+      } else {
+        console.log('🍪 No qalia_session cookie found')
+      }
+      
       set({ isLoading: true, error: null, lastAuthCheck: now })
       
       // Check current authentication status
+      console.log('🔍 Making auth check request to /api/auth/user...')
       const response = await fetch('/api/auth/user', {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       })
       
-      console.log('📝 Auth check response:', { status: response.status, ok: response.ok })
+      console.log('📝 Auth check response:', { 
+        status: response.status, 
+        ok: response.ok,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      })
       
       if (!response.ok) {
-        throw new Error('Failed to check authentication')
+        console.error('❌ Auth check request failed:', response.status, response.statusText)
+        throw new Error(`Failed to check authentication: ${response.status} ${response.statusText}`)
       }
       
       const data: AuthResponse = await response.json()
       console.log('📝 Auth check data:', data)
-      console.log('📝 Auth check summary:', { authenticated: data.authenticated, user: data.user?.login })
+      console.log('📝 Auth check summary:', { 
+        authenticated: data.authenticated, 
+        user: data.user?.login || 'none',
+        hasUserData: !!data.user
+      })
       
       set({
         user: data.user,
@@ -153,12 +184,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       
       if (data.authenticated) {
         console.log('✅ User is authenticated:', data.user?.login)
+        console.log('✅ Authentication successful - user should be logged in')
       } else {
         console.log('❌ User is not authenticated')
+        console.log('❌ Will show login page')
       }
       
     } catch (error) {
       console.error('❌ Auth check failed:', error)
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      })
       // If auth check fails, user is likely not authenticated
       set({
         user: null,

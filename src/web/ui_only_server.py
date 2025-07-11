@@ -257,21 +257,37 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
     """Get session data with detailed logging"""
     logger.info(f"🔍 Looking up session: {session_id[:8]}...")
     
+    # Log current session state
+    logger.info(f"🔍 Current sessions in memory: {len(sessions)}")
+    for stored_session_id in sessions.keys():
+        logger.info(f"   📝 Stored session: {stored_session_id[:8]}...")
+    
     if session_id not in sessions:
         logger.warning(f"❌ Session not found: {session_id[:8]}...")
+        logger.warning(f"❌ Available sessions: {[s[:8] + '...' for s in sessions.keys()]}")
         log_sessions_state()
         return None
     
     session_data = sessions[session_id]
-    expires_at = datetime.fromisoformat(session_data["expires_at"])
+    logger.info(f"🔍 Session found in memory: {session_id[:8]}...")
     
-    if datetime.now() > expires_at:
+    # Check expiration
+    expires_at_str = session_data["expires_at"]
+    expires_at = datetime.fromisoformat(expires_at_str)
+    now = datetime.now()
+    
+    logger.info(f"🔍 Session expiration check:")
+    logger.info(f"   ⏰ Current time: {now.isoformat()}")
+    logger.info(f"   ⏰ Expires at: {expires_at.isoformat()}")
+    logger.info(f"   ⏰ Time until expiry: {(expires_at - now).total_seconds()} seconds")
+    
+    if now > expires_at:
         logger.warning(f"⏰ Session expired: {session_id[:8]}... (expired at {expires_at})")
         del sessions[session_id]
         log_sessions_state()
         return None
     
-    logger.info(f"✅ Session found: {session_id[:8]}... user={session_data.get('user', {}).get('login', 'unknown')}")
+    logger.info(f"✅ Session found and valid: {session_id[:8]}... user={session_data.get('user', {}).get('login', 'unknown')}")
     return session_data
 
 def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
@@ -306,10 +322,11 @@ app = FastAPI(title="Qalia UI Recording Server")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=["http://localhost:3000", "http://localhost:8000", "http://157.245.241.244"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Initialize GitHub OAuth
@@ -397,22 +414,50 @@ async def github_callback(code: str, state: str, response: Response):
         session_id = create_session(user_data, access_token)
         logger.info(f"✅ Session created: {session_id[:8]}...")
         
-        # Set session cookie
+        # Set session cookie with enhanced logging
         logger.info("🍪 Setting session cookie...")
+        logger.info(f"🍪 Cookie name: qalia_session")
+        logger.info(f"🍪 Cookie value: {session_id[:8]}...")
+        logger.info(f"🍪 Cookie max_age: {24 * 60 * 60} seconds (24 hours)")
+        logger.info(f"🍪 Cookie httponly: True")
+        logger.info(f"🍪 Cookie secure: False (development mode)")
+        logger.info(f"🍪 Cookie samesite: lax")
+        logger.info(f"🍪 Cookie path: / (default)")
+        logger.info(f"🍪 Cookie domain: (default - current domain)")
+        
         response.set_cookie(
             key="qalia_session",
             value=session_id,
             max_age=24 * 60 * 60,  # 24 hours
             httponly=True,
             secure=False,  # Set to True in production with HTTPS
-            samesite="lax"
+            samesite="lax",
+            path="/"  # Explicitly set path
         )
         
+        logger.info("✅ Session cookie set successfully!")
+        
+        # Verify session was created correctly
+        logger.info("🔍 Verifying session creation...")
+        verification_session = get_session(session_id)
+        if verification_session:
+            logger.info(f"✅ Session verification successful: {verification_session['user']['login']}")
+        else:
+            logger.error("❌ Session verification failed - session not found after creation!")
+        
         logger.info("✅ OAuth callback completed successfully!")
-        logger.info(f"🔄 Redirecting to dashboard...")
+        logger.info(f"🔄 About to redirect to dashboard...")
+        
+        # Add a small delay to ensure session is fully written
+        import asyncio
+        await asyncio.sleep(0.1)
         
         # Redirect to dashboard
-        return RedirectResponse(url="/", status_code=302)
+        redirect_response = RedirectResponse(url="/", status_code=302)
+        logger.info(f"🔄 Redirect response created: {redirect_response.status_code}")
+        logger.info(f"🔄 Redirect URL: {redirect_response.headers.get('location')}")
+        
+        return redirect_response
         
     except HTTPException as e:
         logger.error(f"❌ HTTP Exception in OAuth callback: {e.detail}")
@@ -448,6 +493,24 @@ async def logout(request: Request, response: Response):
 async def get_user(request: Request):
     """Get current user information with detailed logging"""
     logger.info("🔍 API request: Get current user")
+    
+    # Log all request headers for debugging
+    logger.info("🔍 Request headers:")
+    for name, value in request.headers.items():
+        if name.lower() == "cookie":
+            logger.info(f"   🍪 {name}: {value}")
+        else:
+            logger.info(f"   📝 {name}: {value}")
+    
+    # Log specific cookie information
+    all_cookies = request.cookies
+    logger.info(f"🍪 All cookies received: {dict(all_cookies)}")
+    
+    qalia_session_cookie = request.cookies.get("qalia_session")
+    if qalia_session_cookie:
+        logger.info(f"🍪 qalia_session cookie found: {qalia_session_cookie[:8]}...")
+    else:
+        logger.info("🍪 qalia_session cookie NOT found")
     
     user = get_current_user(request)
     if not user:
@@ -575,6 +638,51 @@ async def send_to_session(session_id: str, message: Dict[str, Any]):
 async def health_check():
     """Health check endpoint."""
     return {"message": "Qalia UI Recording Server", "status": "running"}
+
+# Debug endpoint for OAuth troubleshooting
+@app.get("/api/debug/auth")
+async def debug_auth(request: Request):
+    """Debug endpoint to help troubleshoot OAuth issues"""
+    logger.info("🔍 Debug auth endpoint called")
+    
+    # Get all cookies
+    all_cookies = dict(request.cookies)
+    
+    # Get session info
+    session_id = request.cookies.get("qalia_session")
+    session_info = None
+    if session_id:
+        session_info = get_session(session_id)
+    
+    debug_info = {
+        "timestamp": datetime.now().isoformat(),
+        "cookies": {
+            "all_cookies": all_cookies,
+            "qalia_session_cookie": session_id[:8] + "..." if session_id else None,
+            "qalia_session_found": session_id is not None
+        },
+        "session": {
+            "session_id": session_id[:8] + "..." if session_id else None,
+            "session_found": session_info is not None,
+            "session_valid": session_info is not None and session_info.get("user") is not None,
+            "user": session_info.get("user", {}).get("login") if session_info else None
+        },
+        "server_state": {
+            "total_sessions": len(sessions),
+            "active_sessions": [s[:8] + "..." for s in sessions.keys()],
+            "oauth_states": len(oauth_states)
+        },
+        "request_info": {
+            "headers": dict(request.headers),
+            "client": request.client.host if request.client else None,
+            "method": request.method,
+            "url": str(request.url)
+        }
+    }
+    
+    logger.info(f"🔍 Debug info: {debug_info}")
+    
+    return debug_info
 
 
 # Serve built React app

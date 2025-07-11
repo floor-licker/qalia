@@ -96,7 +96,7 @@ secrets.env
 *.env
 
 # Secrets
-.github/secrets.env
+.github/secrets.env 
 
 # Node.js dependencies
 node_modules/

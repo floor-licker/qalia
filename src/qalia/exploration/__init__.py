@@ -9,7 +9,7 @@ Contains all exploration logic, strategies, and execution components:
 """
 
 from .strategies.systematic import SystematicStrategy
-from .strategies.intelligent import IntelligentStrategy
+from .strategies.intelligent_agent import GPTAgent
 from .elements.discovery import ElementDiscovery
 from .elements.extraction import ElementExtractor
 from .actions.executor import ActionExecutor
@@ -17,7 +17,7 @@ from .modals.detection import ModalDetector
 from .modals.handling import ModalHandler
 
 __all__ = [
-    'SystematicStrategy', 'IntelligentStrategy',
+    'SystematicStrategy', 'GPTAgent',
     'ElementDiscovery', 'ElementExtractor',
     'ActionExecutor',
     'ModalDetector', 'ModalHandler'

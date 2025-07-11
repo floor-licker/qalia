@@ -140,5 +140,5 @@ jobs:
       run: |
         echo "Waiting for service to start..."
         sleep 20
-        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting"
+        curl -f http://${{ secrets.DO_HOST }}/health || echo "Health check failed - service may still be starting" 
         curl -f http://${{ secrets.DO_HOST }}/api/auth/user || echo "Auth API check failed - service may still be starting" 
